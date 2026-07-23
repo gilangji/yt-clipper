@@ -44,7 +44,11 @@ def get_crop_center(t, crops, W, H):
     if not crops:
         return W // 2, H // 2, None
     
-    crops_sorted = sorted(crops, key=lambda x: x['time'])
+    crops_valid = [c for c in crops if c.get('cx') is not None and c.get('cy') is not None]
+    if not crops_valid:
+        return W // 2, H // 2, None
+
+    crops_sorted = sorted(crops_valid, key=lambda x: x['time'])
     
     if t <= crops_sorted[0]['time']:
         c = crops_sorted[0]
@@ -200,16 +204,22 @@ def main():
             sum_cx, sum_cy, count = 0.0, 0.0, 0
             for c_other in crops_sorted:
                 if abs(c_other['time'] - t_curr) <= 0.8: # 0.8s radius (1.6s window)
-                    sum_cx += c_other['cx']
-                    sum_cy += c_other['cy']
-                    count += 1
-            smoothed_crops.append({
-                'time': t_curr,
-                'cx': sum_cx / count,
-                'cy': sum_cy / count,
-                'landmarks': c.get('landmarks'),
-                'manual': c.get('manual')
-            })
+                    cx_val = c_other.get('cx')
+                    cy_val = c_other.get('cy')
+                    if cx_val is not None and cy_val is not None:
+                        sum_cx += float(cx_val)
+                        sum_cy += float(cy_val)
+                        count += 1
+            if count > 0:
+                smoothed_crops.append({
+                    'time': t_curr,
+                    'cx': sum_cx / count,
+                    'cy': sum_cy / count,
+                    'landmarks': c.get('landmarks'),
+                    'manual': c.get('manual')
+                })
+            else:
+                smoothed_crops.append(c)
         crops = smoothed_crops
     time_ranges = cfg.get('timeRanges', [])
     heatmap_overlay = cfg.get('heatmapOverlay', False)
