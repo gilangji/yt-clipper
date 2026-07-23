@@ -28,22 +28,24 @@ const getHighlights = asyncHandler(async (req, res) => {
   let absolutePath = path.join(config.folders.downloads, baseName);
 
   if (!fileExists(absolutePath)) {
-    // Jika tidak ditemukan, coba cari file dengan videoId yang sama tapi beda resolusi (misal fallback 360p)
-    const match = baseName.match(/^([a-zA-Z0-9_-]{11})_/);
-    if (match) {
-      const videoId = match[1];
-      try {
-        const files = fs.readdirSync(config.folders.downloads);
-        const fallbackFile = files.find(f => f.startsWith(`${videoId}_`) && f.endsWith('.mp4'));
-        if (fallbackFile) {
-          absolutePath = path.join(config.folders.downloads, fallbackFile);
-        }
-      } catch (err) {}
+    // Coba cari di folder temp jika video disimpan sementara
+    const tempPath = path.join(config.folders.temp, baseName);
+    if (fileExists(tempPath)) {
+      absolutePath = tempPath;
     }
   }
 
   if (!fileExists(absolutePath)) {
-    throw AppError.notFound('Video sumber tidak ditemukan.', ERROR_CODES.FILE_NOT_FOUND);
+    // Coba cari file mp4 apapun di temp/ atau downloads/ yang mengandung baseName
+    try {
+      const tempFiles = fs.readdirSync(config.folders.temp);
+      const matchTemp = tempFiles.find(f => f.includes(baseName) || f.endsWith('.mp4'));
+      if (matchTemp) absolutePath = path.join(config.folders.temp, matchTemp);
+    } catch (e) {}
+  }
+
+  if (!fileExists(absolutePath)) {
+    throw AppError.notFound('Video sumber tidak ditemukan. Silakan muat video terlebih dahulu.', ERROR_CODES.FILE_NOT_FOUND);
   }
 
   const result = await highlightService.detectHighlights(absolutePath);

@@ -1,0 +1,5 @@
+{"timestamp":"2026-07-23T13:12:30.042Z","level":"warn","message":"Aplikasi tetap dijalankan meskipun ada dependency eksternal yang hilang. Beberapa fitur mungkin gagal."}
+{"timestamp":"2026-07-23T13:12:30.075Z","level":"info","message":"YouTube Clipper berjalan di http://localhost:3000 (env: development)"}
+{"timestamp":"2026-07-23T13:12:30.110Z","level":"info","message":"Cleanup scheduler aktif (setiap 5 menit, TTL file 30 menit)"}
+{"timestamp":"2026-07-23T13:22:09.493Z","level":"info","message":"YouTube Clipper berjalan di http://localhost:3000 (env: development)"}
+{"timestamp":"2026-07-23T13:22:09.502Z","level":"info","message":"Cleanup scheduler aktif (setiap 5 menit, TTL file 30 menit)"}

@@ -225,14 +225,16 @@ def main():
         
     is_split = aspect_ratio == '9:16-split'
     
-    # Map resolution string to target height
+    # Map resolution string to target height (Maksimal 720p)
     resolution_height_map = {
-        '1080p': 1080,
+        '1080p': 720,
         '720p': 720,
         '480p': 480,
         '360p': 360
     }
     target_height = resolution_height_map.get(resolution)
+    if target_height is None or target_height > 720:
+        target_height = 720
     
     # 1. Compute output dimensions W_out, H_out
     if target_height:
@@ -270,6 +272,12 @@ def main():
                 H_out = int(W / target_ratio)
         W_out = (W_out // 2) * 2
         H_out = (H_out // 2) * 2
+
+    # Pastikan H_out tidak pernah melebihi 720p
+    if H_out > 720:
+        scale = 720.0 / H_out
+        H_out = 720
+        W_out = (int(W_out * scale) // 2) * 2
 
     # 2. Compute native crop box size W_crop, H_crop
     if is_split:

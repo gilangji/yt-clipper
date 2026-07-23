@@ -34,6 +34,70 @@ function detectPythonBinary() {
   return 'python3';
 }
 
+function detectYtdlpBinary() {
+  if (process.env.YTDLP_PATH && process.env.YTDLP_PATH !== 'yt-dlp') return process.env.YTDLP_PATH;
+
+  const localVenvUnix = path.join(ROOT_DIR, 'venv', 'bin', 'yt-dlp');
+  if (fs.existsSync(localVenvUnix)) return localVenvUnix;
+
+  const localVenvWin = path.join(ROOT_DIR, 'venv', 'Scripts', 'yt-dlp.exe');
+  if (fs.existsSync(localVenvWin)) return localVenvWin;
+
+  const macosVenv = '/Users/macos/AndroidStudioProjects/yt-clipper/venv/bin/yt-dlp';
+  if (fs.existsSync(macosVenv)) return macosVenv;
+
+  const termuxYtdlp = '/data/data/com.termux/files/usr/bin/yt-dlp';
+  if (fs.existsSync(termuxYtdlp)) return termuxYtdlp;
+
+  return 'yt-dlp';
+}
+
+function detectFfmpegBinary() {
+  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+
+  const macosVenv = '/Users/macos/AndroidStudioProjects/yt-clipper/venv/bin/ffmpeg';
+  if (fs.existsSync(macosVenv)) return macosVenv;
+
+  const macBrew1 = '/opt/homebrew/bin/ffmpeg';
+  if (fs.existsSync(macBrew1)) return macBrew1;
+
+  const macBrew2 = '/usr/local/bin/ffmpeg';
+  if (fs.existsSync(macBrew2)) return macBrew2;
+
+  const termuxFfmpeg = '/data/data/com.termux/files/usr/bin/ffmpeg';
+  if (fs.existsSync(termuxFfmpeg)) return termuxFfmpeg;
+
+  try {
+    const ffmpegStatic = require('ffmpeg-static');
+    if (ffmpegStatic && fs.existsSync(ffmpegStatic)) return ffmpegStatic;
+  } catch (e) {}
+
+  return 'ffmpeg';
+}
+
+function detectFfprobeBinary() {
+  if (process.env.FFPROBE_PATH) return process.env.FFPROBE_PATH;
+
+  const macosVenv = '/Users/macos/AndroidStudioProjects/yt-clipper/venv/bin/ffprobe';
+  if (fs.existsSync(macosVenv)) return macosVenv;
+
+  const macBrew1 = '/opt/homebrew/bin/ffprobe';
+  if (fs.existsSync(macBrew1)) return macBrew1;
+
+  const macBrew2 = '/usr/local/bin/ffprobe';
+  if (fs.existsSync(macBrew2)) return macBrew2;
+
+  const termuxFfprobe = '/data/data/com.termux/files/usr/bin/ffprobe';
+  if (fs.existsSync(termuxFfprobe)) return termuxFfprobe;
+
+  try {
+    const ffprobeStatic = require('@ffprobe-installer/ffprobe');
+    if (ffprobeStatic && ffprobeStatic.path && fs.existsSync(ffprobeStatic.path)) return ffprobeStatic.path;
+  } catch (e) {}
+
+  return 'ffprobe';
+}
+
 /**
  * Resolve folder path dari env (relative ke root project) menjadi absolute path.
  * @param {string} envValue
@@ -63,9 +127,9 @@ const config = {
   },
 
   binaries: {
-    ytdlp: process.env.YTDLP_PATH || 'yt-dlp',
-    ffmpeg: process.env.FFMPEG_PATH || 'ffmpeg',
-    ffprobe: process.env.FFPROBE_PATH || 'ffprobe',
+    ytdlp: detectYtdlpBinary(),
+    ffmpeg: detectFfmpegBinary(),
+    ffprobe: detectFfprobeBinary(),
     python: detectPythonBinary(),
     ytdlpCookiesFromBrowser: process.env.YTDLP_COOKIES_FROM_BROWSER || null,
     ytdlpCookiesPath: process.env.YTDLP_COOKIES_PATH || null,

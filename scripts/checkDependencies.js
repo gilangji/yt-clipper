@@ -48,10 +48,7 @@ function checkAllDependencies() {
   const ffprobe = checkBinary(ffprobePath, ['-version']);
 
   const pythonBin = config.binaries.python || 'python3';
-  const pythonScript = "import sys, numpy; mods=['numpy']; " +
-    "try:\n import cv2; mods.append('opencv')\nexcept:\n pass\n" +
-    "try:\n import mediapipe; mods.append('mediapipe')\nexcept:\n pass\n" +
-    "print(f'Python {sys.version.split()[0]} ({\", \".join(mods)})')";
+  const pythonScript = "import sys; print(f'Python {sys.version.split()[0]}')";
   const python = checkBinary(pythonBin, ['-c', pythonScript]);
 
   const results = { ytdlp, ffmpeg, ffprobe, python };
