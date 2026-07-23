@@ -1015,7 +1015,7 @@
 
   async function startBackgroundPreviewDownload() {
     try {
-      // Kita download resolusi paling ringan (360p atau 480p) agar cepat dan hemat bandwidth
+      // Mengunduh preview 360p agar super cepat dan hemat kuota/bandwidth
       const resolution = '360p'; 
       const response = await apiRequest('/api/download', {
         method: 'POST',

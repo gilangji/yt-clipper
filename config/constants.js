@@ -38,10 +38,10 @@ const RESOLUTIONS = Object.freeze({
   P360: '360p',
 });
 
-// Mapping resolusi -> format selector yt-dlp (Maksimal 720p untuk kecepatan & efisiensi)
+// Mapping resolusi -> format selector yt-dlp
 const RESOLUTION_FORMAT_MAP = Object.freeze({
-  [RESOLUTIONS.ORIGINAL]: 'bestvideo[height<=720]+bestaudio/best[height<=720]',
-  [RESOLUTIONS.P1080]: 'bestvideo[height<=720]+bestaudio/best[height<=720]',
+  [RESOLUTIONS.ORIGINAL]: 'bestvideo+bestaudio/best',
+  [RESOLUTIONS.P1080]: 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
   [RESOLUTIONS.P720]: 'bestvideo[height<=720]+bestaudio/best[height<=720]',
   [RESOLUTIONS.P480]: 'bestvideo[height<=480]+bestaudio/best[height<=480]',
   [RESOLUTIONS.P360]: 'bestvideo[height<=360]+bestaudio/best[height<=360]',
