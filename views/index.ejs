@@ -1,0 +1,203 @@
+<%- include('partials/header') %>
+
+
+  <div class="grain"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">[&nbsp;⏱&nbsp;]</span>
+      <span class="brand-name">Clipreel</span>
+    </div>
+    <div class="topbar-actions">
+      <span class="tag">yt-dlp + ffmpeg</span>
+      <button id="themeToggle" class="icon-btn" title="Ubah tema" aria-label="Ubah tema">◐</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- ===== HERO / URL INPUT ===== -->
+    <section class="hero">
+      <p class="eyebrow">TIMECODE 00:00:00 — 00:00:00</p>
+      <h1>Potong momen terbaik dari video YouTube mana pun.</h1>
+      <p class="lede">Tempel tautan, tandai in-point dan out-point, lalu ekspor. Tidak perlu mengunduh seluruh video.</p>
+
+      <form id="urlForm" class="url-form" autocomplete="off">
+        <div id="dropzone" class="dropzone">
+          <input
+            type="text"
+            id="urlInput"
+            name="url"
+            placeholder="https://youtube.com/watch?v=…  atau tempel/drop link di sini"
+            required
+          />
+          <button type="submit" id="loadBtn" class="btn btn-primary">
+            <span class="btn-label">Muat Video</span>
+          </button>
+        </div>
+      </form>
+      <p id="urlError" class="field-error" hidden></p>
+    </section>
+
+    <!-- ===== PREVIEW + TRIM PANEL ===== -->
+    <section id="previewSection" class="panel preview-panel" hidden>
+      <div class="preview-grid">
+        <div class="thumb-wrap" style="position: relative; background: #000; overflow: hidden; aspect-ratio: 16/9;">
+          <img id="thumbImg" src="" alt="Thumbnail video" style="width:100%; height:100%; object-fit:cover; display:block;" />
+          <video id="videoElement" crossorigin="anonymous" playsinline style="display:none; width:100%; height:100%; object-fit:contain; position:absolute; top:0; left:0;"></video>
+          <canvas id="trackerCanvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2;"></canvas>
+          <div id="cropPreviewBox" class="crop-preview-box hidden" style="position:absolute; border:2px dashed var(--accent); box-shadow:0 0 10px rgba(94,234,212,0.4); pointer-events:auto; cursor:move; background:rgba(94,234,212,0.04); z-index:3;"></div>
+          <span id="durationBadge" class="duration-badge">00:00:00</span>
+        </div>
+
+        <div class="meta">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <h2 id="videoTitle">—</h2>
+            <span id="aiStatus" class="tag" style="font-size:10px; margin-left:10px; border-color:var(--border);">AI OFFLINE</span>
+          </div>
+          <p id="videoChannel" class="muted">—</p>
+
+          <dl class="meta-grid">
+            <div><dt>Durasi</dt><dd id="metaDuration">—</dd></div>
+            <div><dt>Estimasi Ukuran</dt><dd id="metaSize">—</dd></div>
+            <div><dt>Subtitle</dt><dd id="metaSubtitle">—</dd></div>
+            <div><dt>Resolusi Tersedia</dt><dd id="metaResolutions">—</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <!-- Signature element: timecode ruler menampilkan rentang clip terpilih -->
+      <div class="ruler-block">
+        <div class="ruler" id="ruler" style="cursor:pointer;">
+          <div class="ruler-ticks" id="rulerTicks"></div>
+          <div class="ruler-selection" id="rulerSelection"></div>
+          <div id="timelinePlayhead" style="position:absolute; top:0; bottom:0; width:2px; background:var(--accent); pointer-events:none; display:none;"></div>
+        </div>
+        <div id="timelineHeatmap" class="timeline-heatmap hidden" style="height:8px; background:rgba(255,255,255,0.02); border-radius:4px; position:relative; margin-top:6px; overflow:hidden; border:1px solid var(--border);"></div>
+      </div>
+
+      <div id="highlightsContainer" class="hidden" style="margin-top:15px; padding:16px; background:var(--bg-alt); border-radius:10px; border:1px solid var(--border);">
+        <!-- Header row -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+          <span class="field-label" style="color:var(--accent); font-size:11px; font-weight:600;">🔥 Rekomendasi Momen (Suggested Highlights)</span>
+          <button id="exportSelectedBtn" class="btn btn-accent" style="display:none; padding:7px 16px; font-size:12px; font-weight:700;">
+            ✂️ Ekspor Terpilih (<span id="exportSelectedCount">0</span>)
+          </button>
+        </div>
+
+        <!-- Viral Grade Legend -->
+        <div id="gradeLegend" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; padding:10px 12px; background:var(--bg-raised); border-radius:8px; border:1px solid var(--border);">
+          <span style="font-size:10px; color:var(--muted); font-weight:600; margin-right:4px; align-self:center;">GRADE:</span>
+          <span style="font-size:10px; background:#ef444422; color:#ef4444; border:1px solid #ef444455; border-radius:5px; padding:2px 8px; font-weight:700;">S · VIRAL TINGGI</span>
+          <span style="font-size:10px; background:#f9731622; color:#f97316; border:1px solid #f9731655; border-radius:5px; padding:2px 8px; font-weight:700;">A · Sangat Potensial</span>
+          <span style="font-size:10px; background:#eab30822; color:#eab308; border:1px solid #eab30855; border-radius:5px; padding:2px 8px; font-weight:700;">B · Berpotensi</span>
+          <span style="font-size:10px; background:#22c55e22; color:#22c55e; border:1px solid #22c55e55; border-radius:5px; padding:2px 8px; font-weight:700;">C · Layak Konten</span>
+          <span style="font-size:10px; background:#6b728022; color:#6b7280; border:1px solid #6b728055; border-radius:5px; padding:2px 8px; font-weight:700;">D · Informatif</span>
+        </div>
+
+        <div id="highlightsList" style="display:flex; flex-direction:column; gap:6px;"></div>
+      </div>
+
+
+      <form id="clipForm" class="clip-form">
+        <div class="field-row">
+          <label>
+            <span class="field-label">IN — start</span>
+            <input type="text" id="startInput" name="start" placeholder="00:00:00" value="00:00:00" required />
+          </label>
+          <label>
+            <span class="field-label">OUT — end</span>
+            <input type="text" id="endInput" name="end" placeholder="00:01:00" required />
+          </label>
+          <label>
+            <span class="field-label">Resolusi</span>
+            <select id="resolutionSelect" name="resolution">
+              <option value="original">Original</option>
+              <option value="1080p">1080p</option>
+              <option value="720p" selected>720p</option>
+              <option value="480p">480p</option>
+              <option value="360p">360p</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="field-row" style="margin-top: 15px;">
+          <label>
+            <span class="field-label">Aspect Ratio Output</span>
+            <select id="aspectRatioSelect" name="aspectRatio">
+              <option value="original" selected>Landscape (Original)</option>
+              <option value="9:16">9:16 Vertical (Shorts/TikTok)</option>
+              <option value="9:16-split">9:16 Vertical + Split Gameplay</option>
+              <option value="1:1">1:1 Square</option>
+            </select>
+          </label>
+          <label style="grid-column: span 2;">
+            <span class="field-label">Headline Text Overlay</span>
+            <input type="text" id="headlineInput" name="headlineText" placeholder="Teks banner atas, misal: INTELLECT & ENERGY" style="font-family: inherit; font-size: 14px;" />
+          </label>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:16px;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="heatmapToggle" name="heatmapOverlay" style="width:16px; height:16px; accent-color:var(--accent);" />
+            <span style="font-size:13px; color:var(--text);">Burn Heatmap Wajah</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="dynamicZoomToggle" name="dynamicZoom" style="width:16px; height:16px; accent-color:var(--accent);" />
+            <span style="font-size:13px; color:var(--text);">Dynamic Zoom (Jump-Cut)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input type="checkbox" id="audioEnhanceToggle" name="audioEnhance" style="width:16px; height:16px; accent-color:var(--accent);" checked />
+            <span style="font-size:13px; color:var(--text);">Denoise & Penjernih Suara</span>
+          </label>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+          <div></div>
+          <button type="button" id="detectHighlightsBtn" class="btn btn-ghost" style="padding: 8px 16px; font-size:12px;">
+            <span>🔥 Deteksi Highlights Otomatis</span>
+          </button>
+        </div>
+
+        <p id="clipError" class="field-error" hidden></p>
+        <button type="submit" id="clipBtn" class="btn btn-accent">
+          <span class="btn-label">Potong &amp; Ekspor Clip</span>
+        </button>
+      </form>
+    </section>
+
+
+    <!-- ===== PROGRESS PANEL ===== -->
+    <section id="progressSection" class="panel progress-panel" hidden>
+      <div class="progress-head">
+        <span id="progressStage" class="progress-stage">Menunggu antrian…</span>
+        <span id="progressPercent" class="progress-percent">0%</span>
+      </div>
+      <div class="progress-track">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+      <div class="vu-meter" id="vuMeter" aria-hidden="true"></div>
+    </section>
+
+    <!-- ===== RESULT PANEL ===== -->
+    <section id="resultSection" class="panel result-panel" hidden>
+      <div class="result-icon">✓</div>
+      <div>
+        <h3>Clip siap diunduh</h3>
+        <p id="resultFilename" class="muted mono">—</p>
+      </div>
+      <div class="result-actions">
+        <a id="downloadBtn" class="btn btn-primary" href="#" download>Download</a>
+        <button id="deleteBtn" class="btn btn-ghost">Hapus File</button>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="page-footer">
+    <p>Clipreel — dibuat untuk memotong video secara efisien. File otomatis dihapus setelah 30 menit.</p>
+  </footer>
+
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+<%- include('partials/footer') %>
