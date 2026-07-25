@@ -42,14 +42,23 @@ async function processClipJob(jobId) {
     let finalSourcePath = sourcePath;
     let useCache = false;
 
+    // Definisi hirarki kualitas resolusi
+    const resRank = { '360p': 1, '480p': 2, '720p': 3, '1080p': 4, 'original': 5 };
+    const reqRank = resRank[resolution] || 5;
+
     if (!fileExists(sourcePath)) {
-      // Jika resolusi spesifik tidak ada, coba cari file dengan videoId yang sama tapi beda resolusi (misal fallback 360p)
+      // Hanya izinkan fallback cache jika resolusi file cache SAMA ATAU LEBIH TINGGI dari yang diminta
       try {
         const files = fs.readdirSync(config.folders.downloads);
-        const fallbackFile = files.find(f => f.startsWith(`${videoId}_`) && f.endsWith('.mp4'));
-        if (fallbackFile) {
-          sourcePath = path.join(config.folders.downloads, fallbackFile);
-          finalSourcePath = sourcePath;
+        const candidateFiles = files.filter(f => f.startsWith(`${videoId}_`) && f.endsWith('.mp4'));
+        for (const file of candidateFiles) {
+          const matchRes = file.replace(`${videoId}_`, '').replace('.mp4', '');
+          const fileRank = resRank[matchRes] || 5;
+          if (fileRank >= reqRank) {
+            sourcePath = path.join(config.folders.downloads, file);
+            finalSourcePath = sourcePath;
+            break;
+          }
         }
       } catch (err) {}
     }

@@ -159,10 +159,15 @@ def resize_frame(frame, new_w, new_h):
     h, w = frame.shape[0], frame.shape[1]
     if h == new_h and w == new_w:
         return frame
-    y_indices = (np.arange(new_h) * (h / new_h)).astype(int)
-    x_indices = (np.arange(new_w) * (w / new_w)).astype(int)
-    y_indices = np.clip(y_indices, 0, h - 1)
-    x_indices = np.clip(x_indices, 0, w - 1)
+    try:
+        import importlib
+        cv2_mod = importlib.import_module('cv2')
+        return cv2_mod.resize(frame, (new_w, new_h), interpolation=cv2_mod.INTER_CUBIC)
+    except Exception:
+        pass
+    # High-quality bilinear interpolation if cv2 is not available
+    y_indices = np.clip((np.arange(new_h) * (h / new_h)).astype(int), 0, h - 1)
+    x_indices = np.clip((np.arange(new_w) * (w / new_w)).astype(int), 0, w - 1)
     return frame[y_indices[:, None], x_indices, :]
 
 def generate_wave_frame(w, h, frame_idx):
@@ -361,7 +366,7 @@ def main():
         
     cmd_out += [
         '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
-        '-preset', 'fast', '-crf', '22',
+        '-preset', 'fast', '-crf', '18',
         output_path
     ]
     

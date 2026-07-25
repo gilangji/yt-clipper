@@ -35,7 +35,12 @@ function detectPythonBinary() {
 }
 
 function detectYtdlpBinary() {
-  if (process.env.YTDLP_PATH && process.env.YTDLP_PATH !== 'yt-dlp') return process.env.YTDLP_PATH;
+  const sysBin = '/usr/local/bin/yt-dlp';
+  if (fs.existsSync(sysBin)) return sysBin;
+
+  if (process.env.YTDLP_PATH && process.env.YTDLP_PATH !== 'yt-dlp' && fs.existsSync(process.env.YTDLP_PATH)) {
+    return process.env.YTDLP_PATH;
+  }
 
   const localVenvUnix = path.join(ROOT_DIR, 'venv', 'bin', 'yt-dlp');
   if (fs.existsSync(localVenvUnix)) return localVenvUnix;
