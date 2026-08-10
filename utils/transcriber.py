@@ -467,6 +467,21 @@ STYLES = {
         'margin_v': 75
     },
     # ===== CapCut / TikTok 2026 Trending Styles =====
+    'viral-yellow-karaoke': {
+        'name': 'ViralYellowKaraoke',
+        'font': 'Montserrat',
+        'fontsize': 26,
+        'primary_color': '&H00FFFFFF',      # Teks Putih Dasar
+        'secondary_color': '&H0000FFFF',    # Highlight Kuning Aktif (\kf)
+        'outline_color': '&H00000000',      # Border Hitam Pekat 3.5px
+        'back_color': '&H80000000',         # Bayangan Transparan
+        'bold': 1,
+        'outline': 3.5,
+        'shadow': 1.5,
+        'alignment': 2,                     # Bawah Tengah (Sepertiga Bawah)
+        'margin_v': 110,                    # Jarak 110px (~12-15% dari bawah layar, antara dada & meja)
+        'caption_mode': 'karaoke'           # Frasa Utuh + Sorot Kata Kuning Berjalan
+    },
     'capcut-karaoke': {
         'name': 'CapCutKaraoke',
         'font': 'Montserrat',

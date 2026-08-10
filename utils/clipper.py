@@ -526,7 +526,7 @@ def main():
             
             x = cx - cur_w // 2
             # Headroom adjustment: keep face naturally framed in upper-middle portion (Rule of Thirds)
-            headroom_offset = int(cur_h * 0.08) if aspect_ratio == '9:16' else 0
+            headroom_offset = int(cur_h * 0.10) if aspect_ratio.startswith('9:16') else 0
             y = (cy - cur_h // 2) + headroom_offset
             x = max(0, min(W - cur_w, x))
             y = max(0, min(H - cur_h, y))
