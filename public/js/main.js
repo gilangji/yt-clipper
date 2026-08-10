@@ -1762,14 +1762,17 @@
       return;
     }
 
-    setButtonLoading(detectHighlightsBtn, true, 'Menganalisis audio...');
+    const userApiKey = geminiApiKeyInput ? geminiApiKeyInput.value.trim() : '';
+
+    setButtonLoading(detectHighlightsBtn, true, 'Menganalisis audio & AI...');
     try {
       const response = await apiRequest('/api/highlights', {
         method: 'POST',
         body: JSON.stringify({
           url: urlInput.value.trim(),
           videoPath: sourceVideoFilename,
-          targetDuration: getActivePlatformDuration()
+          targetDuration: getActivePlatformDuration(),
+          apiKey: userApiKey
         })
       });
 

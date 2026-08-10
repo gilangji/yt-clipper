@@ -8,6 +8,7 @@ const fs = require('fs');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 const highlightService = require('../services/highlight.service');
+const aiService = require('../services/ai.service');
 const ytdlpService = require('../services/ytdlp.service');
 const { extractVideoId } = require('../utils/urlValidator');
 const { fileExists } = require('../utils/fileHelper');
@@ -39,7 +40,7 @@ async function waitForDownloadCompletion(folder, videoId, maxWaitMs = 45000) {
  * Menganalisis video sumber untuk mendeteksi highlights.
  */
 const getHighlights = asyncHandler(async (req, res) => {
-  const { videoPath, video_path, url = '', title = '', targetDuration, maxHighlights } = req.body;
+  const { videoPath, video_path, url = '', title = '', targetDuration, maxHighlights, apiKey = null } = req.body;
   const targetName = videoPath || video_path || url;
 
   if (!targetName) {
@@ -116,6 +117,15 @@ const getHighlights = asyncHandler(async (req, res) => {
     targetDuration,
     maxHighlights,
   });
+
+  // Tingkatkan akurasi Judul, Caption, & Hashtags unik per klip via Google Gemini AI
+  if (result.highlights && result.highlights.length > 0) {
+    try {
+      result.highlights = await aiService.enhanceHighlightsWithAI(result.highlights, title || videoId, apiKey);
+    } catch (aiErr) {
+      logger.warn('AI enhancement highlights gagal, menggunakan template fallback:', aiErr.message);
+    }
+  }
 
   res.json({
     success: true,

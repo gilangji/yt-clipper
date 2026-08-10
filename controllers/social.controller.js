@@ -72,4 +72,25 @@ const publishClip = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { publishClip, generateCaption };
+const geminiManager = require('../services/geminiManager.service');
+
+const manageGeminiKeys = asyncHandler(async (req, res) => {
+  const { action, keys, key } = req.body;
+
+  let status;
+  if (action === 'add') {
+    status = geminiManager.addKeys(keys || key);
+  } else if (action === 'remove') {
+    status = geminiManager.removeKey(key);
+  } else {
+    status = geminiManager.getKeysStatus();
+  }
+
+  res.json({
+    success: true,
+    message: 'Status pool Gemini API Key berhasil diperbarui.',
+    data: status
+  });
+});
+
+module.exports = { publishClip, generateCaption, manageGeminiKeys };
