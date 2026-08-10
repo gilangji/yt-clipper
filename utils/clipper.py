@@ -119,6 +119,41 @@ def get_crop_center(t, crops, W, H):
             
     return W // 2, H // 2, None
 
+def get_dual_crop_centers(t, crops, W, H):
+    """
+    Mengambil posisi pusat (cx, cy) terpisah untuk Tokoh Kiri (Frame Atas)
+    dan Tokoh Kanan (Frame Bawah) dalam format 9:16 Dual-Split Screen.
+    """
+    cx_main, cy_main, landmarks = get_crop_center(t, crops, W, H)
+
+    # Posisi default simetris jika tidak ada 2 deteksi terpisah
+    cx_left = int(W * 0.28)
+    cy_left = cy_main
+    cx_right = int(W * 0.72)
+    cy_right = cy_main
+
+    if cx_main < W // 2:
+        cx_left = cx_main
+        cy_left = cy_main
+    else:
+        cx_right = cx_main
+        cy_right = cy_main
+
+    # Cari di crops apakah ada sampel wajah di sisi berlawanan dekat waktu t
+    if crops:
+        crops_valid = [c for c in crops if c.get('cx') is not None]
+        opposite_crops = [c for c in crops_valid if (cx_main < W // 2 and c['cx'] * W >= W // 2) or (cx_main >= W // 2 and c['cx'] * W < W // 2)]
+        if opposite_crops:
+            best_opp = min(opposite_crops, key=lambda c: abs(c.get('time', 0) - t))
+            if cx_main < W // 2:
+                cx_right = int(best_opp['cx'] * W)
+                cy_right = int(best_opp.get('cy', 0.5) * H)
+            else:
+                cx_left = int(best_opp['cx'] * W)
+                cy_left = int(best_opp.get('cy', 0.5) * H)
+
+    return (cx_left, cy_left), (cx_right, cy_right), landmarks
+
 def merge_multi_range_audio(ffmpeg_path, original_path, time_ranges, cropped_video_path, audio_enhance=False):
     temp_dir = os.path.dirname(cropped_video_path)
     import uuid
@@ -274,7 +309,9 @@ def main():
         sys.stderr.write("Invalid video file dimensions.\n")
         sys.exit(1)
         
-    is_split = aspect_ratio == '9:16-split'
+    is_split_gameplay = aspect_ratio == '9:16-split'
+    is_split_dual = aspect_ratio == '9:16-dualsplit'
+    is_split = is_split_gameplay or is_split_dual
     
     # Map resolution string to target height
     resolution_height_map = {
@@ -411,6 +448,12 @@ def main():
     frame_size = W * H * 3
     heatmap_accum = np.zeros((H_crop, W_crop), dtype=np.float32)
     
+    # State Stabilizer Kamera untuk gerakan yang tenang (tanpa hiperaktif/jitter)
+    cam_cx, cam_cy = None, None
+    cam_cx2, cam_cy2 = None, None
+    deadband_thresh = 0.025  # 2.5% deadband: kamera DIAM jika pergerakan mikro
+    smooth_alpha_k = 0.08    # Inersia peluncuran mulus kamera saat pembicara benar-benar pindah
+
     for r in time_ranges:
         start_t = r['start']
         end_t = r['end']
@@ -441,7 +484,33 @@ def main():
                 
             t = start_t + frame_idx / fps
             frame = np.frombuffer(raw_frame, dtype=np.uint8).reshape((H, W, 3))
-            cx, cy, landmarks = get_crop_center(t, crops, W, H)
+            
+            if is_split_dual:
+                (raw_cx1, raw_cy1), (raw_cx2, raw_cy2), landmarks = get_dual_crop_centers(t, crops, W, H)
+                if cam_cx is None or cam_cy is None:
+                    cam_cx, cam_cy = float(raw_cx1), float(raw_cy1)
+                    cam_cx2, cam_cy2 = float(raw_cx2), float(raw_cy2)
+                else:
+                    if abs(raw_cx1 - cam_cx) / float(W) > deadband_thresh:
+                        cam_cx += smooth_alpha_k * (raw_cx1 - cam_cx)
+                    if abs(raw_cy1 - cam_cy) / float(H) > deadband_thresh:
+                        cam_cy += smooth_alpha_k * (raw_cy1 - cam_cy)
+                    if abs(raw_cx2 - cam_cx2) / float(W) > deadband_thresh:
+                        cam_cx2 += smooth_alpha_k * (raw_cx2 - cam_cx2)
+                    if abs(raw_cy2 - cam_cy2) / float(H) > deadband_thresh:
+                        cam_cy2 += smooth_alpha_k * (raw_cy2 - cam_cy2)
+                cx, cy = int(cam_cx), int(cam_cy)
+                cx2, cy2 = int(cam_cx2), int(cam_cy2)
+            else:
+                raw_cx, raw_cy, landmarks = get_crop_center(t, crops, W, H)
+                if cam_cx is None or cam_cy is None:
+                    cam_cx, cam_cy = float(raw_cx), float(raw_cy)
+                else:
+                    if abs(raw_cx - cam_cx) / float(W) > deadband_thresh:
+                        cam_cx += smooth_alpha_k * (raw_cx - cam_cx)
+                    if abs(raw_cy - cam_cy) / float(H) > deadband_thresh:
+                        cam_cy += smooth_alpha_k * (raw_cy - cam_cy)
+                cx, cy = int(cam_cx), int(cam_cy)
             
             # Dynamic zoom logic (jump cut every 6 seconds of speech)
             sf = 1.0
@@ -497,15 +566,33 @@ def main():
                 alpha = np.expand_dims(heatmap_accum * 0.6, axis=-1)
                 cropped_frame = (alpha * color_map + (1.0 - alpha) * cropped_frame).astype(np.uint8)
                 
-            # If Split-Screen: combine speaker (top) and dynamic liquid wave background (bottom)
-            if is_split:
+            # If Split-Screen: combine speaker (top) and dynamic liquid wave background (bottom) or dual speaker
+            if is_split_dual:
                 final_frame = np.zeros((H_out, W_out, 3), dtype=np.uint8)
-                # Resize speaker frame to top half: W_out x H_out // 2
+                speaker_h = H_out // 2
+                
+                # Top half: Tokoh Kiri (Speaker 1)
+                x1 = max(0, min(W - cur_w, cx - cur_w // 2))
+                y1 = max(0, min(H - cur_h, cy - cur_h // 2))
+                top_part = resize_frame(frame[y1:y1+cur_h, x1:x1+cur_w], W_out, speaker_h)
+                
+                # Bottom half: Tokoh Kanan (Speaker 2)
+                x2 = max(0, min(W - cur_w, cx2 - cur_w // 2))
+                y2 = max(0, min(H - cur_h, cy2 - cur_h // 2))
+                bottom_part = resize_frame(frame[y2:y2+cur_h, x2:x2+cur_w], W_out, speaker_h)
+                
+                final_frame[0:speaker_h, 0:W_out] = top_part
+                final_frame[speaker_h:H_out, 0:W_out] = bottom_part
+                
+                # Garis pemisah neon 2px di tengah
+                div_y = speaker_h
+                final_frame[div_y-1:div_y+1, :] = np.array([168, 233, 47], dtype=np.uint8)
+            elif is_split_gameplay:
+                final_frame = np.zeros((H_out, W_out, 3), dtype=np.uint8)
                 speaker_h = H_out // 2
                 top_part = resize_frame(cropped_frame, W_out, speaker_h)
                 final_frame[0:speaker_h, 0:W_out] = top_part
                 
-                # Generate dynamic color wave background for bottom half
                 bottom_part = generate_wave_frame(W_out, speaker_h, processed_frames)
                 final_frame[speaker_h:H_out, 0:W_out] = bottom_part
             else:
