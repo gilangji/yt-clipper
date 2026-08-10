@@ -14,13 +14,9 @@ Aplikasi pemotong dan pengolah video YouTube berbasis web (Node.js & Python) yan
   2. `gemini-2.5-flash` (Pro/Heavy Engine — 9.6% traffic)
   3. `gemini-2.0-flash` (Fallback Legacy Engine — 0.3%)
   4. `gemini-3.5-flash` (High-Reasoning Engine — 0.2%)
-- **✂️ Text-Based Video Editor**: Mengedit dan memotong klip video langsung melalui pengeditan teks transkrip (secepat mengedit dokumen Word).
-- **🔥 Karaoke Emoji Auto-Pop Subtitles**: Penambahan emoji otomatis (🔥, 🧠, 💰, 🚀, ⏱️, 🤫, 🎯, ⚠️, 😴) pada kata-kata kunci subtitle ASS/SRT untuk meningkatkan retensi penonton.
+- **👥 9:16 Dual-Split Screen 2 Orang (Podcast)**: Pemotongan layar atas-bawah otomatis untuk 2 pembicara (Host Atas / Tamu Bawah) dengan penjejakan wajah ganda AI dan garis pemisah sinematik.
 - **🎙️ Studio-Grade Audio Equalizer & Denoise**: Kombinasi filter audio studio (`afftdn` + `highpass=f=80` + `lowpass=f=12000` + `loudnorm=I=-16:TP=-1.5:LRA=11`) untuk vokal yang jernih dan berbobot.
 - **📱 Smoothstep Hermite 9:16 Vertical Crop**: Pergerakan kamera *Smoothstep* yang alami untuk fokus pada pembicara/objek tanpa pergerakan patah (*jittery*).
-- **🎮 Split-Screen Gameplay**: Format setengah layar atas pembicara dan setengah layar bawah efek audio/visual dinamis.
-- **📝 Subtitle & Style Karaoke**: Pilihan 24+ preset style subtitle (MrBeast Pop, CapCut Neon, Karaoke Kuning, Montserrat, Impact, dll.).
-- **🎵 Background Music (BGM)**: Pilihan musik latar bawaan (*Cinematic, Lofi, Upbeat*) dengan pengaturan volume audio dan ducking otomatis.
 - **⚡ Silence Remover**: Memotong jeda diam secara otomatis (>0.35s) untuk meningkatkan retensi penonton.
 - **🩺 Health Check Endpoint** (`GET /api/health`): Status kesiapan engine untuk Android/Termux — cek binary (yt-dlp/ffmpeg/ffprobe) via PATH, cek Python engine tanpa load model berat, cek cache model Whisper, dan jumlah Gemini key aktif.
 - **📱 Android Media Scanner**: Hook otomatis ke MediaStore Android (`termux-media-scan`) — video hasil ekspor langsung muncul di Galeri/File Manager HP tanpa scan manual.
