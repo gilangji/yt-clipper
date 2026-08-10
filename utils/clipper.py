@@ -525,8 +525,9 @@ def main():
             cur_h = (cur_h // 2) * 2
             
             x = cx - cur_w // 2
-            # Headroom adjustment: keep face naturally framed in upper-middle portion (Rule of Thirds)
-            headroom_offset = int(cur_h * 0.10) if aspect_ratio.startswith('9:16') else 0
+            # Headroom adjustment: 4% offset memberikan 1-2 jari jarak dari atas layar,
+            # menjaga seluruh kepala, telinga, rambut, dan bahu utuh tanpa terpotong di tepi.
+            headroom_offset = int(cur_h * 0.04) if aspect_ratio.startswith('9:16') else 0
             y = (cy - cur_h // 2) + headroom_offset
             x = max(0, min(W - cur_w, x))
             y = max(0, min(H - cur_h, y))
