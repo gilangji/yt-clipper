@@ -1988,6 +1988,14 @@
       const info = document.createElement('div');
       info.style.cssText = 'flex: 1; min-width: 0;';
 
+      // ===== Vizard-style Title Banner =====
+      if (hl.autoTitle) {
+        const titleEl = document.createElement('div');
+        titleEl.style.cssText = 'font-weight: 700; font-size: 13px; color: var(--text); margin-bottom: 4px; line-height: 1.3;';
+        titleEl.textContent = hl.autoTitle;
+        info.appendChild(titleEl);
+      }
+
       const topLine = document.createElement('div');
       topLine.style.cssText = 'display: flex; align-items: center; gap: 4px; flex-wrap: wrap;';
 
@@ -2067,8 +2075,8 @@
       viralText.textContent = `${vEmoji} ${vLabel}`;
 
       const scoreText = document.createElement('span');
-      scoreText.style.cssText = 'font-size: 10px; color: var(--muted); margin-left: auto;';
-      scoreText.textContent = `${vs}/100`;
+      scoreText.style.cssText = `font-size: 10.5px; color: ${borderColor}; margin-left: auto; font-weight: 800;`;
+      scoreText.textContent = `${(vs / 10).toFixed(1)} VIRALITY`;
 
       bottomLine.appendChild(barWrap);
       bottomLine.appendChild(viralText);
