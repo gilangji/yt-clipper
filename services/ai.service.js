@@ -126,30 +126,38 @@ Berikan respons HANYA dalam format JSON valid tanpa tanda backtick markdown sepe
 }
 
 /**
- * AI Highlights Enhancement: Hasilkan Judul, Deskripsi & Tag unik berbasis AI
- * untuk SETIAP klip segmen hasil deteksi highlight.
+ * AI Highlights Enhancement: Hasilkan Judul, Deskripsi, Tag, Analisis Topik & Poin Penting
+ * alami berbasis AI untuk SETIAP klip segmen hasil deteksi highlight.
  */
 async function enhanceHighlightsWithAI(highlights, baseVideoTitle = '', apiKey = null) {
   if (!Array.isArray(highlights) || highlights.length === 0) return highlights;
 
-  const prompt = `Kamu adalah AI Video Content Strategist.
+  const prompt = `Kamu adalah pakar Senior Video Content Strategist & Media Analyst.
 Analisis ${highlights.length} segmen klip dari video "${baseVideoTitle}".
-Buatkan Judul Viral Unik, Deskripsi/Caption Singkat, dan 5 Hashtag spesifik yang BERBEDA untuk MASING-MASING klip.
 
-Daftar Klip:
-${highlights.map((h, i) => `Klip ${i + 1}: Detik ${Math.round(h.start)} - ${Math.round(h.end)} (Grade: ${h.viralGrade}, Viral Score: ${h.viralScore})`).join('\n')}
+Tugasmu adalah membuatkan Analisis Konten yang Natural & Alami (TANPA BAHASA TEMPLATE KAKU ATAU ROBOTIK).
+Jelaskan secara spesifik dan mendalam apa yang dibahas dalam klip tersebut, mengapa poin itu penting, serta berikan 3 poin kunci (key takeaways).
 
-Berikan respons HANYA dalam format JSON valid array of objects tanpa backtick markdown:
+Daftar Segmen Klip:
+${highlights.map((h, i) => `Klip ${i + 1}: Detik ${Math.round(h.start)} s.d ${Math.round(h.end)} (Grade: ${h.viralGrade}, Score: ${h.viralScore}/100)`).join('\n')}
+
+Berikan respons HANYA dalam format JSON valid array of objects tanpa backtick markdown seperti ini:
 [
   {
     "index": 0,
-    "autoTitle": "Judul Klip 1 Viral (maksimal 7 kata)",
-    "autoTags": "#Shorts #TikTok #TopikKlip1 #Viral #Fakta",
-    "autoDescription": "Deskripsi singkat dan menarik untuk klip 1..."
+    "autoTitle": "Judul Klip Viral Singkat & Menarik (maksimal 8 kata)",
+    "autoTags": "#Shorts #TikTok #TopikKlip #Viral #KontenEdukasi",
+    "autoDescription": "Caption menarik 2-3 kalimat yang mengundang interaksi...",
+    "analysisReason": "Penjelasan analisis santai & cerdas tentang topik spesifik yang dibahas di klip ini dan mengapa segmen ini berpotensi viral.",
+    "highlightPoints": [
+      "💡 Poin kunci 1 yang dibahas dalam klip ini",
+      "🔥 Poin kunci 2 tentang wawasan/solusi utama",
+      "🚀 Poin kunci 3 dampak/takeaway untuk penonton"
+    ]
   }
 ]`;
 
-  const candidate = await callGeminiAPI(prompt, apiKey, 768);
+  const candidate = await callGeminiAPI(prompt, apiKey, 1024);
 
   if (candidate) {
     try {
@@ -162,9 +170,13 @@ Berikan respons HANYA dalam format JSON valid array of objects tanpa backtick ma
             if (resItem.autoTitle) highlights[idx].autoTitle = resItem.autoTitle;
             if (resItem.autoTags) highlights[idx].autoTags = resItem.autoTags;
             if (resItem.autoDescription) highlights[idx].autoDescription = resItem.autoDescription;
+            if (resItem.analysisReason) highlights[idx].analysisReason = resItem.analysisReason;
+            if (Array.isArray(resItem.highlightPoints) && resItem.highlightPoints.length > 0) {
+              highlights[idx].highlightPoints = resItem.highlightPoints;
+            }
           }
         });
-        logger.info(`Berhasil melengkapi ${aiResults.length} klip highlight dengan AI Metadata dari Gemini!`);
+        logger.info(`Berhasil melengkapi ${aiResults.length} klip highlight dengan AI Content Analysis alami dari Gemini!`);
       }
     } catch (e) {
       logger.warn('Gagal parse AI metadata per highlight dari Gemini:', e.message);
