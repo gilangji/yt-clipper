@@ -214,6 +214,15 @@ async function processClipJob(jobId) {
       }
     }
 
+    // Siapkan finalCrops/finalTimeRanges di sini (bukan TAHAP 2) karena Silence Remover
+    // meng-override finalTimeRanges — deklarasi terlambat menyebabkan ReferenceError (TDZ)
+    // dan fitur selalu gagal. Default: hormati range start/end job bila timeRanges kosong.
+    let finalCrops = job.crops;
+    let finalTimeRanges = job.timeRanges;
+    if (!finalTimeRanges || finalTimeRanges.length === 0) {
+      finalTimeRanges = [{ start: clipStart, end: clipStart + durationSeconds }];
+    }
+
     // ===== TAHAP 1.8: SILENCE REMOVER (jika diaktifkan) =====
     if (job.silenceRemover) {
       jobService.updateJob(jobId, {
@@ -247,9 +256,7 @@ async function processClipJob(jobId) {
     const outputPath = path.join(config.folders.output, `${jobId}_${outputFilename}`);
 
     // Siapkan timeRanges dan crops yang disesuaikan jika menggunakan segmen download
-    let finalCrops = job.crops;
-    let finalTimeRanges = job.timeRanges;
-
+    // (finalCrops/finalTimeRanges sudah dideklarasikan di TAHAP 1.8)
     if (isSection) {
       clipStart = 0;
       if (job.crops && job.crops.length > 0) {
