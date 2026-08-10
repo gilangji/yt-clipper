@@ -11,6 +11,8 @@ TERMUX_PASS="teemo"
 SRC="/home/teemo/yt-clipper"
 DST="~/yt-clipper"
 TARBALL="/tmp/yt-clipper-src.tar.gz"
+# NOTE: /tmp tidak selalu ada di sesi Termux → tujuan di HP pakai $HOME
+REMOTE_TARBALL="~/yt-clipper-src.tar.gz"
 
 echo "==> [1/4] Membuat tarball source (tanpa node_modules/downloads/output/logs)…"
 cd /home/teemo
@@ -22,14 +24,16 @@ tar czf "$TARBALL" \
   --exclude='yt-clipper/logs' \
   --exclude='yt-clipper/.env' \
   --exclude='yt-clipper/env' \
+  --exclude='yt-clipper/.phone_pulls' \
+  --exclude='yt-clipper/pull-termux-config.sh' \
   yt-clipper
 
 echo "==> [2/4] Kirim ke Termux…"
-sshpass -p "$TERMUX_PASS" scp -o StrictHostKeyChecking=no -P "$TERMUX_PORT" "$TARBALL" "$TERMUX_USER@$TERMUX_HOST:$TARBALL"
+sshpass -p "$TERMUX_PASS" scp -o StrictHostKeyChecking=no -P "$TERMUX_PORT" "$TARBALL" "$TERMUX_USER@$TERMUX_HOST:$REMOTE_TARBALL"
 
 echo "==> [3/4] Ekstrak + npm install di Termux…"
 sshpass -p "$TERMUX_PASS" ssh -o StrictHostKeyChecking=no -p "$TERMUX_PORT" "$TERMUX_USER@$TERMUX_HOST" \
-  "cd $DST && tar xzf $TARBALL --strip-components=1 && rm $TARBALL && npm install --no-audit --no-fund 2>&1 | tail -2"
+  "cd $DST && tar xzf $REMOTE_TARBALL --strip-components=1 && rm $REMOTE_TARBALL && npm install --no-audit --no-fund 2>&1 | tail -2"
 
 if [[ "$1" == "--restart" ]]; then
   echo "==> [4/4] Restart server di Termux…"
