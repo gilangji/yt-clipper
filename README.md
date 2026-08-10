@@ -7,6 +7,7 @@ Aplikasi pemotong dan pengolah video YouTube berbasis web (Node.js & Python) yan
 ## 🚀 Fitur Utama & Pembaruan Terbaru (Vizard.ai Standard)
 
 - **🔥 Vizard-Style AI Highlight Detection**: Analisis AI untuk menemukan momen viral terbaik dengan skor Virality (`10.0 VIRALITY`), Judul Clickbait otomatis, Alasan Viralitas, dan 3 Poin Kunci Pembahasan per klip.
+- **🧠 AI Content-Based Highlight Selection (Auto-Clipper Engine)**: Mesin pemilih momen viral berbasis KONTEN (bukan sekadar energi audio) — transkrip dianalisis LLM untuk memilih hook kuat dalam 2 detik pertama, kalimat LENGKAP tanpa potongan di tengah kata, start/end presisi di jeda bicara, durasi 20–120s (prefer 60–90s), urut kronologis, serta social kit lengkap (title id/en, description, hashtags, b-roll query, reason viral).
 - **🔑 Multi-Key Gemini Auto-Rotation Engine**: Pengelolaan pool banyak Google Gemini API Key secara otomatis (*Round-Robin & Failover*). Jika Key 1 mencapai limit (`HTTP 429`), sistem otomatis mengoperasikan Key 2, Key 3, dst.
 - **🤖 Hirarki Model AI Hemat Kuota (Skripsita Engine)**:
   1. `gemini-2.5-flash-lite` (Primary Engine — 89.8% traffic, paling hemat kuota & super cepat)
@@ -21,6 +22,9 @@ Aplikasi pemotong dan pengolah video YouTube berbasis web (Node.js & Python) yan
 - **📝 Subtitle & Style Karaoke**: Pilihan 24+ preset style subtitle (MrBeast Pop, CapCut Neon, Karaoke Kuning, Montserrat, Impact, dll.).
 - **🎵 Background Music (BGM)**: Pilihan musik latar bawaan (*Cinematic, Lofi, Upbeat*) dengan pengaturan volume audio dan ducking otomatis.
 - **⚡ Silence Remover**: Memotong jeda diam secara otomatis (>0.35s) untuk meningkatkan retensi penonton.
+- **🩺 Health Check Endpoint** (`GET /api/health`): Status kesiapan engine untuk Android/Termux — cek binary (yt-dlp/ffmpeg/ffprobe) via PATH, cek Python engine tanpa load model berat, cek cache model Whisper, dan jumlah Gemini key aktif.
+- **📱 Android Media Scanner**: Hook otomatis ke MediaStore Android (`termux-media-scan`) — video hasil ekspor langsung muncul di Galeri/File Manager HP tanpa scan manual.
+- **🚀 Android/Termux Management Scripts**: `start-android.sh` (pre-flight check binary + auto-heal, hold `python-ctranslate2` agar aman dari `pkg upgrade`, jalankan server via nohup) dan `stop-android.sh` (stop server bersih via PID file).
 - **📱 Android Termux Ready**: Kompatibel 100% untuk dijalankan secara lokal di HP Android melalui emulator **Termux**.
 
 ---

@@ -25,7 +25,7 @@ const MODEL_HIERARCHY = [
 const deadModels = new Set();
 const FAIL_STATUS_TO_SKIP = new Set([400, 404, 403, 429]);
 
-async function callGeminiAPI(prompt, userApiKey = null, maxTokens = 256) {
+async function callGeminiAPI(prompt, userApiKey = null, maxTokens = 256, timeoutMs = 12000, extraConfig = {}) {
   let keyPool = [];
   if (userApiKey && userApiKey.trim()) {
     keyPool.push(userApiKey.trim());
@@ -56,10 +56,10 @@ async function callGeminiAPI(prompt, userApiKey = null, maxTokens = 256) {
       try {
         const response = await axios.post(endpoint, {
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 }
+          generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7, ...extraConfig }
         }, {
           headers: { 'Content-Type': 'application/json' },
-          timeout: 12000
+          timeout: timeoutMs
         });
 
         const candidate = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;

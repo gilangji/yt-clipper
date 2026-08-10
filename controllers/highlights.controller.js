@@ -40,7 +40,10 @@ async function waitForDownloadCompletion(folder, videoId, maxWaitMs = 45000) {
  * Menganalisis video sumber untuk mendeteksi highlights.
  */
 const getHighlights = asyncHandler(async (req, res) => {
-  const { videoPath, video_path, url = '', title = '', targetDuration, maxHighlights, apiKey = null } = req.body;
+  const {
+    videoPath, video_path, url = '', title = '', targetDuration, maxHighlights,
+    apiKey = null, mode = 'auto', extraPrompt = '', language = 'auto'
+  } = req.body;
   const targetName = videoPath || video_path || url;
 
   if (!targetName) {
@@ -52,6 +55,10 @@ const getHighlights = asyncHandler(async (req, res) => {
 
   const searchFolders = [
     config.folders.downloads,
+    // Fallback project-local — penting di Android: file sering ada di
+    // ~/yt-clipper/downloads padahal env menunjuk shared storage.
+    path.join(config.rootDir, 'downloads'),
+    path.join(config.rootDir, 'temp'),
     '/home/teemo/yt-clipper/downloads',
     '/home/teemo/yt-clipper-mobile/downloads',
     config.folders.temp,
@@ -113,13 +120,37 @@ const getHighlights = asyncHandler(async (req, res) => {
     );
   }
 
-  const result = await highlightService.detectHighlights(absolutePath, title, {
-    targetDuration,
-    maxHighlights,
-  });
+  let result = null;
+  let engine = 'audio';
+
+  // Mode 'ai': wajib coba AI transcript highlight (auto-clipper style).
+  // Mode 'auto' (default): coba AI dulu → fallback ke audio-energy bila gagal.
+  if (mode !== 'audio') {
+    try {
+      result = await highlightService.detectHighlightsWithAI(absolutePath, title, {
+        targetDuration,
+        maxHighlights,
+        apiKey,
+        extraPrompt,
+        language,
+      });
+      if (result) engine = 'ai';
+    } catch (aiErr) {
+      logger.warn('AI highlight detection error, fallback ke audio-energy:', aiErr.message);
+    }
+  }
+
+  if (!result) {
+    result = await highlightService.detectHighlights(absolutePath, title, {
+      targetDuration,
+      maxHighlights,
+    });
+    engine = 'audio';
+  }
 
   // Tingkatkan akurasi Judul, Caption, & Hashtags unik per klip via Google Gemini AI
-  if (result.highlights && result.highlights.length > 0) {
+  // (hanya untuk engine audio — hasil AI sudah membawa social kit sendiri)
+  if (engine === 'audio' && result.highlights && result.highlights.length > 0) {
     try {
       result.highlights = await aiService.enhanceHighlightsWithAI(result.highlights, title || videoId, apiKey);
     } catch (aiErr) {
@@ -130,6 +161,7 @@ const getHighlights = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: {
+      engine,
       highlights: result.highlights,
       energies: result.energies,
     },

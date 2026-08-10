@@ -10,6 +10,7 @@
     <div class="topbar-actions">
       <button type="button" id="guideBtn" class="btn btn-sm btn-ghost" title="Buku Panduan & Cara Pemakaian">📖 Panduan</button>
       <span class="tag"><span class="dot"></span><span class="tag-text">yt-dlp + ffmpeg</span></span>
+      <span id="enginePill" class="engine-pill" title="Status engine AI">⚙️ cek…</span>
       <button id="themeToggle" class="icon-btn" title="Ubah tema" aria-label="Ubah tema">◐</button>
     </div>
   </header>
@@ -276,7 +277,8 @@
                   <label class="wide">
                     <span class="field-label">Template</span>
                     <select id="subtitleStyleSelect" name="subtitleStyle">
-                      <option value="quick-brown-inv" selected>🦊 Quick Brown INVERSE (Kuning Dasar, Putih Berjalan — Default)</option>
+                      <option value="auto-clipper" selected>🎛️ Kustom Auto-Clipper (Karaoke/Standard + Typografi Penuh)</option>
+                      <option value="quick-brown-inv">🦊 Quick Brown INVERSE (Kuning Dasar, Putih Berjalan)</option>
                       <option value="quick-brown">🦊 The Quick Brown Fox (Karaoke Kuning CapCut)</option>
                       <option value="mrbeast-white">🟥 MrBeast Pop (Kata-per-kata, Putih)</option>
                       <option value="capcut-karaoke">🎵 CapCut Karaoke (Kuning Aktif)</option>
@@ -377,6 +379,88 @@
                       <option value="hi">🇮🇳 हिन्दी</option>
                     </select>
                   </label>
+                </div>
+
+                <!-- ===== AUTO-CLIPPER CUSTOM SUBTITLE SETTINGS (ported from auto-clipper) ===== -->
+                <div class="ac-subtitle-panel">
+                  <div class="ac-panel-title">🎛️ Kustomisasi Auto-Clipper <span class="ac-mode-badge" id="acModeBadge">KARAOKE</span></div>
+
+                  <!-- Mode Tampilan Subtitle -->
+                  <div class="ac-sec-title">Mode Tampilan Subtitle</div>
+                  <div class="ac-mode-grid">
+                    <button type="button" class="ac-mode-btn active" id="acModeKaraoke">
+                      <span class="ac-mode-name">✨ Karaoke (Word-by-word) <span class="ac-check">✓</span></span>
+                      <span class="ac-mode-desc">Setiap kata yang diucapkan akan menyala terang satu per satu, sangat cocok untuk video Shorts/TikTok.</span>
+                    </button>
+                    <button type="button" class="ac-mode-btn" id="acModeStandard">
+                      <span class="ac-mode-name">📄 Standar (Kalimat Penuh) <span class="ac-check">✓</span></span>
+                      <span class="ac-mode-desc">Menampilkan satu baris kalimat lengkap secara statis.</span>
+                    </button>
+                  </div>
+
+                  <!-- Live Preview -->
+                  <div class="ac-live-preview">
+                    <span class="ac-preview-label">👁️ Pratinjau Langsung Subtitle (Live Preview)</span>
+                    <div class="ac-preview-text" id="acLivePreviewText"></div>
+                  </div>
+
+                  <!-- Font Family -->
+                  <div class="ac-sec-title">Jenis Huruf (Font Family)</div>
+                  <div class="ac-font-grid" id="acFontFamilyGrid">
+                    <button type="button" class="ac-opt-btn active" data-font="Arial" style="font-family:Arial">Arial</button>
+                    <button type="button" class="ac-opt-btn" data-font="Montserrat" style="font-family:Montserrat">Montserrat</button>
+                    <button type="button" class="ac-opt-btn" data-font="Impact" style="font-family:Impact">Impact</button>
+                    <button type="button" class="ac-opt-btn" data-font="Roboto" style="font-family:Roboto">Roboto</button>
+                    <button type="button" class="ac-opt-btn" data-font="Oswald" style="font-family:Oswald">Oswald</button>
+                    <button type="button" class="ac-opt-btn" data-font="Bebas Neue" style="font-family:'Bebas Neue'">Bebas</button>
+                    <button type="button" class="ac-opt-btn" data-font="Courier New" style="font-family:'Courier New'">Courier</button>
+                  </div>
+
+                  <!-- Font Size & Weight -->
+                  <div class="ac-two-grid">
+                    <div>
+                      <div class="ac-sec-title">Ukuran Huruf (Font Size)</div>
+                      <div class="ac-size-grid" id="acFontSizeGrid">
+                        <button type="button" class="ac-opt-btn" data-scale="0.8">Kecil 0.8x</button>
+                        <button type="button" class="ac-opt-btn active" data-scale="1.0">Normal 1.0x</button>
+                        <button type="button" class="ac-opt-btn" data-scale="1.2">Besar 1.2x</button>
+                        <button type="button" class="ac-opt-btn" data-scale="1.5">Ekstra 1.5x</button>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="ac-sec-title">Ketebalan Huruf (Font Weight)</div>
+                      <div class="ac-size-grid" id="acFontWeightGrid">
+                        <button type="button" class="ac-opt-btn" data-weight="normal">Normal</button>
+                        <button type="button" class="ac-opt-btn active" data-weight="bold">Tebal (Bold)</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Text Styling -->
+                  <div class="ac-sec-title">Gaya Tambahan (Text Styling)</div>
+                  <div class="ac-style-row">
+                    <button type="button" class="ac-toggle-btn active" id="acUppercaseToggle">
+                      <span><span class="ac-aa">AA</span>&nbsp; HURUF BESAR SEMUA (UPPERCASE)</span>
+                      <span class="ac-check">✓</span>
+                    </button>
+                    <button type="button" class="ac-toggle-btn" id="acItalicToggle">
+                      <span><em class="ac-italic">I</em>&nbsp; Huruf Miring (Italic)</span>
+                      <span class="ac-check">✓</span>
+                    </button>
+                  </div>
+
+                  <!-- Highlight Color -->
+                  <div class="ac-sec-title" id="acHighlightLabel">Warna Sorotan Kata (Highlight Color)</div>
+                  <div class="ac-color-row" id="acColorRow">
+                    <button type="button" class="ac-color-swatch active" data-color="#FFE600" title="Yellow Neon" style="background:#FFE600"></button>
+                    <button type="button" class="ac-color-swatch" data-color="#00FFFF" title="Cyan Aqua" style="background:#00FFFF"></button>
+                    <button type="button" class="ac-color-swatch" data-color="#00FF66" title="Lime Green" style="background:#00FF66"></button>
+                    <button type="button" class="ac-color-swatch" data-color="#FF3366" title="Hot Pink" style="background:#FF3366"></button>
+                    <button type="button" class="ac-color-swatch" data-color="#FFFFFF" title="Pure White" style="background:#FFFFFF"></button>
+                    <button type="button" class="ac-color-swatch" data-color="#FF9900" title="Vibrant Orange" style="background:#FF9900"></button>
+                    <input type="color" id="acColorInput" class="ac-color-input" value="#FFE600" title="Custom color" />
+                    <input type="text" id="acColorText" class="ac-color-text" value="#FFE600" placeholder="#FFE600" maxlength="7" />
+                  </div>
                 </div>
 
                 <div class="sub-preview-area">
@@ -494,6 +578,12 @@
             </details>
 
             <p id="clipError" class="field-error" hidden></p>
+
+            <label class="ai-highlight-toggle" title="Gunakan AI untuk memilih momen viral berdasarkan transkrip konten (ala auto-clipper / Opus Clip). Jatuh otomatis ke analisis audio bila tanpa API key.">
+              <input type="checkbox" id="aiViralModeCheck" checked />
+              <span class="toggle-label">✨ AI Viral Clips <small>(pilih momen via transkrip — butuh API Key Gemini)</small></span>
+            </label>
+
             <button type="submit" id="clipBtn" class="btn btn-accent">
               <span class="btn-label">🔥 Deteksi Highlights Otomatis</span>
             </button>
@@ -618,7 +708,7 @@
             <div class="gstep-num">04</div>
             <div class="gstep-content">
               <h4>Kustomisasi Subtitle &amp; Audio</h4>
-              <p>Buka dropdown <strong>Subtitle &amp; Typografi</strong>, pilih dari <strong>24 Style Subtitle</strong> (Karaoke Kuning, MrBeast Pop, CapCut Neon, dll.). Aktifkan <strong>⚡ Silence Remover</strong> agar jeda diam otomatis terpotong, lalu tambahkan Musik Latar (BGM) jika diinginkan.</p>
+              <p>Buka dropdown <strong>Subtitle &amp; Typografi</strong>. Template <strong>🎛️ Kustom Auto-Clipper</strong> (default) menghadirkan panel gaya ala auto-clipper: pilih <strong>Mode Karaoke (word-by-word)</strong> atau <strong>Standar (kalimat penuh)</strong>, atur <strong>Font Family</strong>, <strong>Ukuran (0.8x–1.5x)</strong>, <strong>Ketebalan</strong>, <strong>UPPERCASE/Italic</strong>, dan <strong>Warna Sorotan Kata</strong> — semua dengan <strong>Live Preview</strong>. Atau pilih dari <strong>24 Style Subtitle</strong> klasik (Karaoke Kuning, MrBeast Pop, CapCut Neon, dll.). Aktifkan <strong>⚡ Silence Remover</strong> agar jeda diam otomatis terpotong, lalu tambahkan Musik Latar (BGM) jika diinginkan.</p>
             </div>
           </div>
 
@@ -635,7 +725,7 @@
         <div class="guide-pro-tips">
           <span class="tip-icon">💡</span>
           <div class="tip-text">
-            <strong>Tips Pro:</strong> Gunakan Rasio <strong>9:16 Vertical</strong> + Subtitle <strong>The Quick Brown Fox Karaoke</strong> + <strong>Silence Remover</strong> untuk memaksimalkan retensi penonton di TikTok, YouTube Shorts, dan Instagram Reels.
+            <strong>Tips Pro:</strong> Gunakan Rasio <strong>9:16 Vertical</strong> + Template <strong>🎛️ Kustom Auto-Clipper</strong> mode <strong>Karaoke</strong> dengan highlight <strong>#FFE600</strong> + <strong>Silence Remover</strong> untuk memaksimalkan retensi penonton di TikTok, YouTube Shorts, dan Instagram Reels.
           </div>
         </div>
 

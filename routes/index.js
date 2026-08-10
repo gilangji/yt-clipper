@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 
 router.use('/info', require('./info.routes'));
+router.use('/health', require('./health.routes'));
 router.use('/clip', require('./clip.routes'));
 router.use('/status', require('./status.routes'));
 router.use('/download', require('./download.routes'));

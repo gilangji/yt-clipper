@@ -54,6 +54,7 @@ async function generateVideoPreview916({
   subtitlePosition = 'bottom',
   subtitleCase = 'uppercase',
   subtitleLanguage = 'auto',
+  subtitleConfig,
   withSubtitle = true,
   aspectRatio = '9:16',
 }) {
@@ -102,6 +103,7 @@ async function generateVideoPreview916({
     withSubtitle ? subtitlePosition : '',
     withSubtitle ? subtitleCase : '',
     withSubtitle ? subtitleLanguage : '',
+    withSubtitle && subtitleConfig ? JSON.stringify(subtitleConfig) : '',
     aspectRatio
   ].join('|');
 
@@ -140,6 +142,7 @@ async function generateVideoPreview916({
         textCase: subtitleCase,
         language: subtitleLanguage,
         fontFamily: subtitleFont,
+        subtitleConfig,
         startSeconds: startSec,
         durationSeconds: previewDuration,
         width: 480,

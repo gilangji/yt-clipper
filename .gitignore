@@ -25,3 +25,7 @@ __pycache__/
 # System / OS
 .DS_Store
 Thumbs.db
+
+# Local backup pulls dari HP (berisi secrets/API keys — jangan pernah di-push)
+.phone_pulls/
+pull-termux-config.sh

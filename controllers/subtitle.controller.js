@@ -20,6 +20,7 @@ const renderPreview = asyncHandler(async (req, res) => {
     text = 'RAHASIA\nSUKSES 2026',
     width = 720,
     height = 1280,
+    subtitleConfig,
   } = req.body || {};
 
   if (typeof style !== 'string' || !style.trim()) {
@@ -34,6 +35,7 @@ const renderPreview = asyncHandler(async (req, res) => {
     text,
     width,
     height,
+    subtitleConfig,
   });
 
   res.type('image/png');

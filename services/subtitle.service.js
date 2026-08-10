@@ -24,7 +24,7 @@ const { ERROR_CODES } = require('../config/constants');
  * @param {number} [params.durationSeconds]
  * @returns {Promise<string>} path ke file .ass yang dihasilkan
  */
-function generateSubtitleAss({ inputPath, style = 'quick-brown-inv', fontSize = 'large', position = 'bottom', textCase = 'uppercase', language = 'auto', fontFamily = 'auto', startSeconds = 0, durationSeconds, width = 720, height = 1280 }) {
+function generateSubtitleAss({ inputPath, style = 'quick-brown-inv', fontSize = 'large', position = 'bottom', textCase = 'uppercase', language = 'auto', fontFamily = 'auto', startSeconds = 0, durationSeconds, width = 720, height = 1280, subtitleConfig }) {
   return new Promise((resolve, reject) => {
     const subId = uuidv4();
     const configPath = path.join(config.folders.temp, `subcfg_${subId}.json`);
@@ -43,6 +43,7 @@ function generateSubtitleAss({ inputPath, style = 'quick-brown-inv', fontSize = 
       textCase,
       language,
       fontFamily,
+      subtitleConfig: subtitleConfig || null,
       startSeconds,
       durationSeconds,
       playResX: width,
@@ -96,7 +97,7 @@ function generateSubtitleAss({ inputPath, style = 'quick-brown-inv', fontSize = 
  * @param {number} [params.height=1280]
  * @returns {Promise<string>} path ke file .png preview
  */
-function renderSubtitlePreview({ style = 'quick-brown-inv', fontSize = 'large', fontFamily = 'auto', textCase = 'uppercase', text = 'RAHASIA\nSUKSES 2026', width = 720, height = 1280 } = {}) {
+function renderSubtitlePreview({ style = 'quick-brown-inv', fontSize = 'large', fontFamily = 'auto', textCase = 'uppercase', text = 'RAHASIA\nSUKSES 2026', width = 720, height = 1280, subtitleConfig } = {}) {
   return new Promise((resolve, reject) => {
     const runId = uuidv4();
     const configPath = path.join(config.folders.temp, `previewcfg_${runId}.json`);
@@ -115,6 +116,7 @@ function renderSubtitlePreview({ style = 'quick-brown-inv', fontSize = 'large', 
       text,
       width,
       height,
+      subtitleConfig: subtitleConfig || null,
       bgColor: '0x101323',
       ffmpegPath: config.binaries.ffmpeg || 'ffmpeg',
     }));

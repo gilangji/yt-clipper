@@ -10,7 +10,10 @@ import os
 import sys
 import json
 import subprocess
-from faster_whisper import WhisperModel
+
+# faster_whisper diimpor lazy di get_whisper_model() — mode preview
+# (render PNG/ASS) tidak butuh model, sehingga tetap jalan walau
+# faster_whisper belum terinstall di environment.
 
 # ===== Whisper Model =====
 # 'tiny' = sangat cepat tapi sering salah dengar & halusinasi (hurut nambah,
@@ -21,18 +24,195 @@ WHISPER_MODEL_NAME = os.environ.get('WHISPER_MODEL', 'base').strip().lower()
 
 # Mode offline: model dipakai dari cache lokal saja → tidak ada percobaan
 # snapshot_download ke network (gagal ketika DNS/network terbatas).
-os.environ.setdefault('HF_HUB_OFFLINE', '1')
+# Khusus Termux: biarkan ONLINE sekali untuk download model pertama kali,
+# lalu otomatis offline di run berikutnya.
 os.environ.setdefault('HF_HUB_DISABLE_TELEMETRY', '1')
+if os.environ.get('ASTRO_HF_ONLINE') != '1':
+    os.environ.setdefault('HF_HUB_OFFLINE', '1')
 
 _WHISPER_MODEL_CACHE = {}
 
+def _best_compute_type():
+    """Pilih compute type terbaik yang didukung backend CPU.
+
+    int8 hanya ada jika kernel SIMD tersedia (mis. x86_64 AVX/AVX2).
+    Di Termux arm64 tanpa NEON-dotprod, ctranslate2 hanya menyediakan
+    float32 → fallback otomatis. Override via env WHISPER_COMPUTE_TYPE.
+    """
+    env = os.environ.get('WHISPER_COMPUTE_TYPE', '').strip()
+    if env:
+        return env
+    try:
+        import ctranslate2
+        supported = ctranslate2.get_supported_compute_types('cpu')
+        for preferred in ('int8', 'int16', 'float16', 'float32'):
+            if preferred in supported:
+                return preferred
+        return 'float32'
+    except Exception:
+        # Gagal query backend → asumsi paling aman: float32 SELALU tersedia.
+        # (int8 di perangkat arm64 tanpa NEON-dotprod akan crash → jangan dipakai)
+        return 'float32'
+
+def _install_fallback_audio_decode():
+    """Bypass PyAV bila tidak terinstall (kasus Termux: `av` tak punya wheel).
+
+    faster_whisper/audio.py melakukan `import av` DI LEVEL MODUL, jadi kita
+    injeksi stub `av` ke sys.modules dulu agar import faster_whisper sukses,
+    lalu patch decode_audio dengan decoder WAV stdlib (wave + numpy).
+    transcriber selalu mengekstrak audio ke WAV 16kHz mono via ffmpeg,
+    sehingga decoder fallback cukup untuk format itu.
+    """
+    try:
+        import av  # noqa: F401
+        return  # PyAV tersedia → biarkan bawaan
+    except Exception:
+        pass
+
+    import types
+    import sys
+    if 'av' not in sys.modules:
+        stub = types.ModuleType('av')
+        stub.audio = types.ModuleType('av.audio')
+        stub.audio.resampler = types.ModuleType('av.audio.resampler')
+        stub.audio.resampler.AudioResampler = lambda *a, **k: None
+        stub.open = lambda *a, **k: None
+        sys.modules['av'] = stub
+        sys.modules['av.audio'] = stub.audio
+        sys.modules['av.audio.resampler'] = stub.audio.resampler
+
+    import wave
+    import numpy as np
+
+    def decode_audio_fallback(path, sampling_rate=16000):
+        with wave.open(str(path), 'rb') as w:
+            n_ch = w.getnchannels()
+            sw = w.getsampwidth()
+            fr = w.getframerate()
+            data = w.readframes(w.getnframes())
+        if sw == 2:
+            samples = np.frombuffer(data, dtype=np.int16)
+        elif sw == 4:
+            samples = np.frombuffer(data, dtype=np.int32)
+        elif sw == 1:
+            samples = np.frombuffer(data, dtype=np.uint8).astype(np.int16) - 128
+        else:
+            raise ValueError(f"Unsupported sample width: {sw}")
+        if n_ch > 1:
+            samples = samples.reshape(-1, n_ch).mean(axis=1)
+        samples = samples.astype(np.float32) / 32768.0
+        if fr != sampling_rate:
+            ratio = fr / sampling_rate
+            if ratio > 1 and float(ratio).is_integer():
+                samples = samples[::int(ratio)]
+            elif ratio < 1 and float(1 / ratio).is_integer():
+                samples = np.repeat(samples, int(1 / ratio))
+            else:
+                idx = np.round(np.arange(0, len(samples), ratio)).astype(int)
+                samples = samples[idx[idx < len(samples)]]
+        return samples
+
+    import faster_whisper.audio as fw_audio
+    fw_audio.decode_audio = decode_audio_fallback
+    for mod_name in ('transcribe', 'vad'):
+        try:
+            mod = __import__(f'faster_whisper.{mod_name}', fromlist=['decode_audio'])
+            if hasattr(mod, 'decode_audio'):
+                mod.decode_audio = decode_audio_fallback
+        except Exception:
+            pass
+
+_install_fallback_audio_decode()
+
+def _transcribe_kwargs(min_silence_ms=300):
+    """Kwargs transkripsi konsisten; VAD hanya jika onnxruntime tersedia.
+
+    faster-whisper butuh onnxruntime untuk Silero VAD — di Termux paket
+    python-onnxruntime bisa bentrok dengan libprotobuf, jadi auto-disable
+    VAD bila tidak terinstall (hasil tetap akurat, hanya tanpa filter diam).
+
+    beam_size bisa diperkecil via env WHISPER_BEAM_SIZE=1 → transkripsi
+    jauh lebih cepat di HP (kualitas sedikit turun). Default 5 (akurat).
+    """
+    beam = int(os.environ.get('WHISPER_BEAM_SIZE', '5') or 5)
+    if beam < 1:
+        beam = 1
+    kw = dict(
+        beam_size=beam,
+        temperature=0.0,
+        condition_on_previous_text=False,
+    )
+    try:
+        import onnxruntime  # noqa: F401
+        kw['vad_filter'] = True
+        kw['vad_parameters'] = dict(min_silence_duration_ms=min_silence_ms)
+    except Exception:
+        kw['vad_filter'] = False
+    return kw
+
+def _is_download_error(msg):
+    """Deteksi error yang berkaitan dengan model belum ada / network."""
+    low = (msg or '').lower()
+    return any(k in low for k in (
+        'could not find', 'no such file', 'snapshot_download',
+        'connection', 'offline mode', 'cannot find', 'not found',
+        'resolve', 'http', 'network', 'hf_hub', 'timeout',
+        'cached file', 'lookup',
+    ))
+
+
 def get_whisper_model():
-    """Singleton model whisper — dibagi antar pemanggilan (hemat load time)."""
-    if WHISPER_MODEL_NAME not in _WHISPER_MODEL_CACHE:
-        _WHISPER_MODEL_CACHE[WHISPER_MODEL_NAME] = WhisperModel(
-            WHISPER_MODEL_NAME, device='cpu', compute_type='int8'
-        )
-    return _WHISPER_MODEL_CACHE[WHISPER_MODEL_NAME]
+    """Singleton model whisper — dibagi antar pemanggilan (hemat load time).
+
+    Auto-heal untuk Termux:
+    - Model belum ada di cache & mode offline → coba SEKALI dengan mode
+      online (download otomatis) supaya fresh install langsung jalan.
+    - ctranslate2 rusak (mis. `pkg upgrade` menimpa .so kustom) →
+      RuntimeError dengan instruksi perbaikan yang jelas, bukan error samar.
+    """
+    if WHISPER_MODEL_NAME in _WHISPER_MODEL_CACHE:
+        return _WHISPER_MODEL_CACHE[WHISPER_MODEL_NAME]
+
+    try:
+        from faster_whisper import WhisperModel
+    except Exception as e:
+        raise RuntimeError(
+            "faster-whisper tidak terinstall / rusak. Instal ulang:\n"
+            "  pip install --no-deps faster-whisper==1.2.1 && "
+            "pip install --no-deps huggingface_hub==1.27.0"
+        ) from e
+
+    try:
+        model = WhisperModel(WHISPER_MODEL_NAME, device='cpu', compute_type=_best_compute_type())
+        _WHISPER_MODEL_CACHE[WHISPER_MODEL_NAME] = model
+        return model
+    except Exception as e:
+        # Case 1: model belum ada & offline → retry online sekali (auto-download)
+        if os.environ.get('HF_HUB_OFFLINE') == '1' and _is_download_error(str(e)):
+            sys.stderr.write(
+                f"[transcriber] Model '{WHISPER_MODEL_NAME}' belum ada di cache, "
+                "mencoba unduh sekali (online)...\n"
+            )
+            os.environ['HF_HUB_OFFLINE'] = '0'
+            try:
+                model = WhisperModel(WHISPER_MODEL_NAME, device='cpu', compute_type=_best_compute_type())
+                _WHISPER_MODEL_CACHE[WHISPER_MODEL_NAME] = model
+                return model
+            except Exception as e2:
+                raise RuntimeError(
+                    f"Gagal mengunduh model '{WHISPER_MODEL_NAME}'. "
+                    f"Periksa jaringan / mirror HuggingFace.\nDetail: {e2}"
+                ) from e2
+        # Case 2: binding ctranslate2 rusak (sangat umum setelah pkg upgrade)
+        low = str(e).lower()
+        if 'ctranslate2' in low or 'undefined symbol' in low or 'cannot open shared object' in low:
+            raise RuntimeError(
+                "ctranslate2 rusak di perangkat ini (umum setelah `pkg upgrade` "
+                "menimpa binding kustom). Rebuild ulang:\n"
+                "  bash ~/yt-clipper/scripts/rebuild_ct2.sh\n"
+                "atau reinstall paket: pkg reinstall python-ctranslate2"
+            ) from e
+        raise RuntimeError(f"Gagal memuat model whisper '{WHISPER_MODEL_NAME}': {e}") from e
 
 def detect_source_language(model, audio_path):
     """Deteksi bahasa asli sekali (stabil) → dipakai sebagai `language` saat
@@ -415,6 +595,24 @@ STYLES = {
         'alignment': 2,
         'margin_v': 75,
         'caption_mode': 'karaoke'           # kebalikan: kuning dasar, putih berjalan
+    },
+    # ===== AUTO-CLIPPER CUSTOM (Karaoke / Standard + Typografi penuh) =====
+    # Rendering diarahkan ke engine custom (words_to_karaoke_ass /
+    # words_to_standard_ass) ketika subtitleConfig dikirim dari frontend.
+    'auto-clipper': {
+        'name': 'AutoClipperCustom',
+        'font': 'Arial',
+        'fontsize': 26,
+        'primary_color': '&H0000E6FF',   # default highlight #FFE600
+        'secondary_color': '&H00FFFFFF',
+        'outline_color': '&H00000000',
+        'back_color': '&H64000000',
+        'bold': 1,
+        'outline': 3.5,
+        'shadow': 1.0,
+        'alignment': 2,
+        'margin_v': 75,
+        'caption_mode': 'custom'          # dispatch ke engine auto-clipper
     }
 }
 
@@ -444,6 +642,223 @@ def format_ass_time(seconds):
     if cs >= 100:
         cs = 99
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+
+# ===========================================================================
+# AUTO-CLIPPER SUBTITLE ENGINE (ported from auto-clipper backend/crop_utils.py)
+# Mode Karaoke (word-by-word pop) & Standard (full sentence static)
+# dengan typography: font family, size scale, weight, italic, uppercase,
+# dan highlight color — identik dengan UI SubtitleConfigControls auto-clipper.
+# ===========================================================================
+
+DEFAULT_SUBTITLE_CONFIG = {
+    "style": "karaoke",              # 'karaoke' | 'standard'
+    "highlight_color": "#FFE600",    # warna sorotan kata (karaoke)
+    "font_family": "Arial",          # Arial/Montserrat/Impact/Roboto/Oswald/Bebas Neue/Courier New
+    "font_size_scale": 1.0,          # 0.8 | 1.0 | 1.2 | 1.5
+    "font_weight": "bold",           # 'normal' | 'bold'
+    "italic": False,
+    "uppercase": True,               # default True untuk karaoke, False untuk standard
+}
+
+FONT_PRESETS = [
+    "Arial", "Montserrat", "Impact", "Roboto",
+    "Oswald", "Bebas Neue", "Courier New",
+]
+
+COLOR_PRESETS = [
+    "#FFE600", "#00FFFF", "#00FF66", "#FF3366",
+    "#FFFFFF", "#FF9900",
+]
+
+
+def hex_to_ass_style_color(hex_str, default="&H0000E6FF"):
+    """Konversi '#RRGGBB' ke format PrimaryColour ASS: '&H00BBGGRR'."""
+    if not hex_str or not isinstance(hex_str, str):
+        return default
+    clean = hex_str.strip().lstrip('#')
+    if len(clean) == 6:
+        try:
+            int(clean, 16)
+            r, g, b = clean[0:2], clean[2:4], clean[4:6]
+            return f"&H00{b.upper()}{g.upper()}{r.upper()}"
+        except ValueError:
+            return default
+    return default
+
+
+def normalize_subtitle_config(raw_config=None, legacy_style="karaoke"):
+    """Menjamin konfigurasi subtitle selalu lengkap dengan fallback yang aman."""
+    default_style = legacy_style if legacy_style in ("standard", "karaoke") else "karaoke"
+    if not isinstance(raw_config, dict):
+        raw_config = {}
+    style = raw_config.get("style", default_style)
+    if style not in ("standard", "karaoke"):
+        style = default_style
+    return {
+        "style": style,
+        "highlight_color": str(raw_config.get("highlight_color", "#FFE600")),
+        "font_family": str(raw_config.get("font_family", "Arial")),
+        "font_size_scale": float(raw_config.get("font_size_scale", 1.0)),
+        "font_weight": str(raw_config.get("font_weight", "bold")),
+        "italic": bool(raw_config.get("italic", False)),
+        "uppercase": bool(raw_config.get("uppercase", (style == "karaoke"))),
+    }
+
+
+def calculate_ass_styles(width, height, custom_margin_v=None, subtitle_config=None):
+    """Calculates proportional font sizes based on video dimensions and custom scale."""
+    cfg = normalize_subtitle_config(subtitle_config)
+    scale = max(0.5, min(2.0, cfg.get("font_size_scale", 1.0)))
+
+    is_vertical = height > width
+    if is_vertical:
+        # Untuk video vertikal (9:16), font size relatif terhadap width, tapi dibatasi
+        font_size = max(14, round(width * 0.055 * scale))
+        margin_v = max(20, round(height * 0.15))
+    else:
+        # Untuk landscape (16:9), width besar → font size relatif terhadap height
+        font_size = max(14, round(height * 0.065 * scale))
+        margin_v = max(20, round(height * 0.08))
+
+    if custom_margin_v is not None and custom_margin_v > 0:
+        margin_v = custom_margin_v
+
+    outline = max(1, round(font_size * 0.08))
+    shadow = outline
+    margin_h = max(20, round(width * 0.05))
+    return font_size, outline, shadow, margin_h, margin_v
+
+
+def build_custom_ass_header(width, height, cfg, primary_color="&H00FFFFFF"):
+    """ASS header untuk mode custom (auto-clipper)."""
+    font_size, outline, shadow, margin_h, margin_v = calculate_ass_styles(width, height, subtitle_config=cfg)
+    outline = max(2, outline)
+    shadow = max(2, shadow)
+    font_name = cfg.get("font_family", "Arial")
+    bold_val = -1 if cfg.get("font_weight") == "bold" else 0
+    italic_val = -1 if cfg.get("italic") else 0
+    return (
+        "[Script Info]\n"
+        "ScriptType: v4.00+\n"
+        "WrapStyle: 1\n"
+        f"PlayResX: {width}\n"
+        f"PlayResY: {height}\n\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, "
+        "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, "
+        "Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        f"Style: Default,{font_name},{font_size},{primary_color},&H00000000,&H80000000,"
+        f"{bold_val},{italic_val},0,0,100,100,0,0,1,{outline},{shadow},2,{margin_h},{margin_h},{margin_v},1\n\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+    )
+
+
+def words_to_karaoke_ass(words, width, height, clip_start, clip_end, subtitle_config=None):
+    """Single-word pop ASS: setiap kata menyala dengan highlight color (mode karaoke)."""
+    cfg = normalize_subtitle_config(subtitle_config, legacy_style="karaoke")
+    ass_primary_color = hex_to_ass_style_color(cfg.get("highlight_color", "#FFE600"))
+    header = build_custom_ass_header(width, height, cfg, primary_color=ass_primary_color)
+    is_uppercase = cfg.get("uppercase", True)
+
+    clip_words = []
+    for w in words:
+        w_start = float(w.get("start", 0))
+        w_end = float(w.get("end", 0))
+        if w_start < clip_end and w_end > clip_start:
+            s = max(0.0, w_start - clip_start)
+            e = min(clip_end - clip_start, w_end - clip_start)
+            if e > s:
+                raw_w = str(w.get("word", "")).strip()
+                if raw_w:
+                    clip_words.append({"word": raw_w, "start": s, "end": e})
+
+    if not clip_words:
+        return header
+
+    events = []
+    num_words = len(clip_words)
+    clip_total = clip_end - clip_start
+
+    for i in range(num_words):
+        curr_word = clip_words[i]
+        w_start = curr_word["start"]
+        raw_end = curr_word["end"]
+
+        if i < num_words - 1:
+            next_start = clip_words[i + 1]["start"]
+            gap = next_start - raw_end
+            if 0 <= gap < 0.2:
+                w_end = next_start
+            else:
+                w_end = raw_end
+            w_end = min(w_end, next_start)
+        else:
+            w_end = min(clip_total, raw_end + 0.35)
+
+        if i < num_words - 1:
+            w_end = min(max(w_end, w_start + 0.08), clip_words[i + 1]["start"])
+        else:
+            w_end = max(w_end, w_start + 0.08)
+
+        if w_end <= w_start:
+            continue
+
+        text = curr_word["word"].upper() if is_uppercase else curr_word["word"]
+        events.append(
+            f"Dialogue: 0,{format_ass_time(w_start)},{format_ass_time(w_end)},Default,,0,0,0,,{text}"
+        )
+
+    return header + "\n".join(events) + ("\n" if events else "")
+
+
+def words_to_standard_ass(words, width, height, clip_start, clip_end, subtitle_config=None):
+    """Sentence-level static ASS: kalimat penuh per baris (mode standard)."""
+    cfg = normalize_subtitle_config(subtitle_config, legacy_style="standard")
+    header = build_custom_ass_header(width, height, cfg, primary_color="&H00FFFFFF")
+    is_uppercase = cfg.get("uppercase", False)
+
+    clip_words = []
+    for w in words:
+        w_start = float(w.get("start", 0))
+        w_end = float(w.get("end", 0))
+        if w_start < clip_end and w_end > clip_start:
+            s = max(0.0, w_start - clip_start)
+            e = min(clip_end - clip_start, w_end - clip_start)
+            if e > s:
+                raw_w = str(w.get("word", "")).strip()
+                if raw_w:
+                    clip_words.append({"word": raw_w, "start": s, "end": e})
+
+    if not clip_words:
+        return header
+
+    chunks = []
+    current_chunk = [clip_words[0]]
+    for w in clip_words[1:]:
+        prev_w = current_chunk[-1]
+        gap = w["start"] - prev_w["end"]
+        if gap > 0.4 or len(current_chunk) >= 7 or prev_w["word"].endswith(('.', '!', '?')):
+            chunks.append(current_chunk)
+            current_chunk = [w]
+        else:
+            current_chunk.append(w)
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    events = []
+    for chunk in chunks:
+        c_start = chunk[0]["start"]
+        c_end = chunk[-1]["end"]
+        sentence = " ".join(w["word"] for w in chunk)
+        text = sentence.upper() if is_uppercase else sentence
+        events.append(
+            f"Dialogue: 0,{format_ass_time(c_start)},{format_ass_time(c_end)},Default,,0,0,0,,{text}"
+        )
+
+    return header + "\n".join(events) + ("\n" if events else "")
+
 
 def extract_audio_segment(input_video, output_audio, start_sec=None, duration_sec=None, ffmpeg_bin='ffmpeg'):
     """Extracts lightweight WAV audio for Whisper transcription"""
@@ -523,18 +938,55 @@ def extract_keywords(text, limit=12, min_len=3):
     return out
 
 
+def _format_srt_ts(seconds):
+    """Format float detik → HH:MM:SS,mmm (SRT)."""
+    ms = int(round((seconds % 1) * 1000))
+    if ms >= 1000:
+        ms = 0
+        seconds += 1
+    s = int(seconds) % 60
+    m = (int(seconds) // 60) % 60
+    h = int(seconds) // 3600
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def transcribe_to_srt(audio_path, output_srt_path, language=None):
+    """Transkripsi cepat → file SRT (untuk AI highlight selection ala auto-clipper).
+
+    Memakai parameter whisper yang sama dengan transcribe_to_json agar akurat:
+    greedy, VAD on, no previous-text loop. Setiap segmen = 1 cue SRT dengan
+    timestamp presisi yang bisa langsung dikirim ke LLM sebagai transcript.
+    """
+    model = get_whisper_model()
+    src = detect_source_language(model, audio_path)
+    segments, info = model.transcribe(
+        audio_path,
+        language=src or None,
+        **_transcribe_kwargs(300)
+    )
+    cues = []
+    for i, segment in enumerate(segments, 1):
+        t = (segment.text or '').strip()
+        if t:
+            start = float(segment.start)
+            end = float(segment.end)
+            cues.append(
+                f"{i}\n{_format_srt_ts(start)} --> {_format_srt_ts(end)}\n{t}\n"
+            )
+    srt_text = "\n".join(cues)
+    with open(output_srt_path, 'w', encoding='utf-8') as f:
+        f.write(srt_text)
+    return len(cues)
+
+
 def transcribe_to_json(audio_path, output_json_path, language=None):
     """Transkripsi cepat → JSON {text, keywords, language} untuk metadata konten."""
     model = get_whisper_model()
     src = detect_source_language(model, audio_path)
     segments, info = model.transcribe(
         audio_path,
-        beam_size=5,
         language=src or None,
-        temperature=0.0,                      # greedy → minim halusinasi
-        condition_on_previous_text=False,      # matikan loop pengulangan kata
-        vad_filter=True,
-        vad_parameters=dict(min_silence_duration_ms=300)
+        **_transcribe_kwargs(300)
     )
     texts = []
     seg_list = []
@@ -624,7 +1076,53 @@ def apply_text_casing(text, case):
     return str(text)
 
 
-def transcribe_and_generate_ass(audio_path, output_ass_path, style_name='yellow-viral', font_size_key='medium', position_key='bottom', text_case='uppercase', language=None, offset_seconds=0.0, font_family=None, play_res_x=720, play_res_y=1280):
+def transcribe_and_generate_custom_ass(audio_path, output_ass_path, subtitle_config=None, language=None, offset_seconds=0.0, play_res_x=720, play_res_y=1280):
+    """Engine auto-clipper: whisper word-timestamps → ASS karaoke (word-by-word pop)
+    atau standard (kalimat penuh), dengan typography custom:
+    font_family, font_size_scale, font_weight, italic, uppercase, highlight_color."""
+    cfg = normalize_subtitle_config(subtitle_config)
+
+    model = get_whisper_model()
+    src_lang = detect_source_language(model, audio_path)
+
+    segments, info = model.transcribe(
+        audio_path,
+        word_timestamps=True,
+        language=src_lang or None,
+        **_transcribe_kwargs(400)
+    )
+
+    words = []
+    for segment in segments:
+        for w in (segment.words or []):
+            wtext = (w.word or '').strip()
+            if not wtext:
+                continue
+            ws = max(0.0, float(w.start) - offset_seconds)
+            we = max(ws + 0.08, float(w.end) - offset_seconds)
+            words.append({"word": wtext, "start": ws, "end": we})
+
+    if not words:
+        header = build_custom_ass_header(play_res_x, play_res_y, cfg,
+                                         primary_color=hex_to_ass_style_color(cfg.get("highlight_color", "#FFE600")))
+        with open(output_ass_path, 'w', encoding='utf-8') as f:
+            f.write(header)
+        return 0
+
+    clip_start = 0.0
+    clip_end = max(w["end"] for w in words) + 0.2
+
+    if cfg.get("style") == "standard":
+        ass = words_to_standard_ass(words, play_res_x, play_res_y, clip_start, clip_end, subtitle_config=cfg)
+    else:
+        ass = words_to_karaoke_ass(words, play_res_x, play_res_y, clip_start, clip_end, subtitle_config=cfg)
+
+    with open(output_ass_path, 'w', encoding='utf-8') as f:
+        f.write(ass)
+    return ass.count("Dialogue:")
+
+
+def transcribe_and_generate_ass(audio_path, output_ass_path, style_name='yellow-viral', font_size_key='medium', position_key='bottom', text_case='uppercase', language=None, offset_seconds=0.0, font_family=None, play_res_x=720, play_res_y=1280, subtitle_config=None):
     """Runs faster-whisper model and generates short-phrase ASS subtitles with custom typography.
     Jika language (target) diberikan dan berbeda dari bahasa asli video,
     subtitle diterjemahkan ke bahasa target.
@@ -633,6 +1131,18 @@ def transcribe_and_generate_ass(audio_path, output_ass_path, style_name='yellow-
     (PlayResY = tinggi video). Fontsize diskalakan relatif terhadap baseline 720
     sehingga proporsi (`huge` → ~5.6% tinggi video) konsisten di semua resolusi.
     """
+    # Dispatch: mode auto-clipper → engine custom (karaoke/standard + typografi)
+    if style_name == 'auto-clipper' or subtitle_config is not None:
+        return transcribe_and_generate_custom_ass(
+            audio_path,
+            output_ass_path,
+            subtitle_config=subtitle_config or {},
+            language=language,
+            offset_seconds=offset_seconds,
+            play_res_x=play_res_x,
+            play_res_y=play_res_y,
+        )
+
     base_style = STYLES.get(style_name, STYLES['quick-brown-inv']).copy()
 
     # Override jenis font jika user memilih font khusus
@@ -669,13 +1179,9 @@ def transcribe_and_generate_ass(audio_path, output_ass_path, style_name='yellow-
 
     segments, info = model.transcribe(
         audio_path,
-        beam_size=5,
         word_timestamps=True,
         language=src_lang or None,
-        temperature=0.0,                      # greedy → minim halusinasi kata
-        condition_on_previous_text=False,      # matikan "karena → karnesa" loop
-        vad_filter=True,
-        vad_parameters=dict(min_silence_duration_ms=400)
+        **_transcribe_kwargs(400)
     )
     detected_lang = getattr(info, 'language', 'en')
     
@@ -820,9 +1326,56 @@ def render_preview(cfg):
     ffmpeg_bin = cfg.get('ffmpegPath', 'ffmpeg')
     bg_arg = cfg.get('bgColor', '0x101323')
     duration_s = float(cfg.get('duration', 3))
+    subtitle_config = cfg.get('subtitleConfig')
 
     if not output_png:
         return 0
+
+    # ===== Mode auto-clipper custom (Karaoke / Standard + typografi penuh) =====
+    if style_name == 'auto-clipper' or subtitle_config is not None:
+        import subprocess as _sp
+        scfg = normalize_subtitle_config(subtitle_config)
+        is_karaoke = scfg.get("style") == "karaoke"
+        primary = hex_to_ass_style_color(scfg.get("highlight_color", "#FFE600")) if is_karaoke else "&H00FFFFFF"
+        header = build_custom_ass_header(width, height, scfg, primary_color=primary)
+        is_upper = scfg.get("uppercase", is_karaoke)
+
+        lines = []
+        if is_karaoke:
+            # Satu baris kata per kata; setiap kata menyala (highlight color) satu per satu.
+            sample_words = [w.strip() for w in str(text).split() if w.strip()]
+            if not sample_words:
+                sample_words = ["VIRAL"]
+            per = max(0.32, duration_s / max(len(sample_words), 1))
+            for i, w in enumerate(sample_words):
+                wt = w.upper() if is_upper else w
+                t0 = i * per
+                t1 = min(t0 + per, duration_s)
+                lines.append(f"Dialogue: 0,{format_ass_time(t0)},{format_ass_time(t1)},Default,,0,0,0,,{wt}")
+            # Tangkap frame saat kata terakhir (sorotan) tampil
+            frame_at = max(0.0, (len(sample_words) - 1) * per + per * 0.45)
+            if frame_at >= duration_s:
+                frame_at = max(0.0, duration_s - 0.3)
+        else:
+            ln = str(text).replace('\n', ' ')
+            st = ln.upper() if is_upper else ln
+            lines.append(f"Dialogue: 0,0:00:00.00,{format_ass_time(duration_s)},Default,,0,0,0,,{st}")
+            frame_at = 0.0
+
+        ass_path = output_png.rsplit('.', 1)[0] + '.ass'
+        with open(ass_path, 'w', encoding='utf-8') as f:
+            f.write(header)
+            f.write("\n".join(lines) + "\n")
+
+        cmd = [
+            ffmpeg_bin, '-y',
+            '-f', 'lavfi', '-i', f'color=c={bg_arg}:s={width}x{height}:d={duration_s}',
+            '-vf', f"ass='{ass_path.replace(chr(39), chr(39) + chr(92) + chr(39))}'",
+            '-ss', str(frame_at),
+            '-frames:v', '1', output_png
+        ]
+        _sp.run(cmd, stdout=_sp.DEVNULL, stderr=_sp.DEVNULL, timeout=30)
+        return os.path.exists(output_png)
 
     base = STYLES.get(style_name, STYLES['quick-brown-inv']).copy()
     if font_family and font_family != 'auto':
@@ -896,7 +1449,46 @@ def render_preview(cfg):
     return os.path.exists(output_png)
 
 
+def _model_cached(name=None):
+    """Cek apakah model whisper sudah ada di HF cache (tanpa load model)."""
+    import pathlib
+    name = name or WHISPER_MODEL_NAME
+    hub_root = os.environ.get(
+        'HF_HOME',
+        os.path.join(os.path.expanduser('~'), '.cache', 'huggingface'),
+    )
+    d = pathlib.Path(hub_root) / 'hub' / f"models--Systran--faster-whisper-{name}"
+    return d.exists() and (d / 'snapshots').exists()
+
+
+def selftest():
+    """Verifikasi engine AI (ctranslate2 + faster-whisper + model siap).
+    `--selftest --fast` → tanpa load model (dipakai /api/health, cepat).
+    Print JSON satu baris. Exit 0 bila siap, 1 bila gagal."""
+    fast = '--fast' in sys.argv[1:]
+    result = {'ok': False, 'model': WHISPER_MODEL_NAME, 'compute': None, 'cached': False, 'error': None}
+    try:
+        import ctranslate2  # noqa: F401
+        result['compute'] = _best_compute_type()
+        result['cached'] = _model_cached()
+        if fast:
+            # Cukup import faster_whisper + cek cache — tanpa load model (cepat)
+            import faster_whisper  # noqa: F401
+            result['ok'] = result['cached']
+        else:
+            get_whisper_model()  # raise bila model / binding rusak
+            result['ok'] = True
+    except Exception as e:
+        result['error'] = str(e)
+    print(json.dumps(result), flush=True)
+    return 0 if result['ok'] else 1
+
+
 def main():
+    # Mode selftest: verifikasi engine tanpa config file
+    if len(sys.argv) >= 2 and sys.argv[1] == '--selftest':
+        sys.exit(selftest())
+
     if len(sys.argv) < 2:
         print("Usage: python transcriber.py <config_json_path>")
         sys.exit(1)
@@ -917,23 +1509,25 @@ def main():
     input_media = cfg['inputMedia']
     output_ass = cfg.get('outputAss')
     output_json = cfg.get('outputJson')
+    output_srt = cfg.get('outputSrt')
     style_name = cfg.get('style', 'quick-brown-inv')
     font_size_key = cfg.get('fontSize', 'medium')
     position_key = cfg.get('position', 'bottom')
     text_case = cfg.get('textCase', 'uppercase')
     language = cfg.get('language', 'auto')
     font_family = cfg.get('fontFamily', 'auto')
+    subtitle_config = cfg.get('subtitleConfig')
     start_sec = cfg.get('startSeconds', 0.0)
     duration_sec = cfg.get('durationSeconds', None)
     ffmpeg_bin = cfg.get('ffmpegPath', 'ffmpeg')
     play_res_x = int(cfg.get('playResX', 720))
     play_res_y = int(cfg.get('playResY', 1280))
 
-    if not output_ass and not output_json:
-        sys.stderr.write("Error in transcriber: outputAss or outputJson required.\n")
+    if not output_ass and not output_json and not output_srt:
+        sys.stderr.write("Error in transcriber: outputAss, outputJson, or outputSrt required.\n")
         sys.exit(1)
     
-    temp_dir = os.path.dirname(output_ass or output_json)
+    temp_dir = os.path.dirname(output_ass or output_json or output_srt)
     temp_wav = os.path.join(temp_dir, f"transcribe_{os.getpid()}.wav")
     
     try:
@@ -941,6 +1535,9 @@ def main():
         if output_json:
             count = transcribe_to_json(temp_wav, output_json, language)
             print(f"SUCCESS:Transcribed {count} segments to JSON.")
+        elif output_srt:
+            count = transcribe_to_srt(temp_wav, output_srt, language)
+            print(f"SUCCESS:Transcribed {count} cues to SRT.")
         else:
             count = transcribe_and_generate_ass(
             temp_wav,
@@ -953,7 +1550,8 @@ def main():
             offset_seconds=0.0,
             font_family=font_family,
             play_res_x=play_res_x,
-            play_res_y=play_res_y
+            play_res_y=play_res_y,
+            subtitle_config=subtitle_config
         )
         print(f"SUCCESS:Generated {count} subtitle cues.")
     except Exception as e:

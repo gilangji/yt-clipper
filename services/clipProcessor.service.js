@@ -203,6 +203,7 @@ async function processClipJob(jobId) {
           textCase: job.subtitleCase || 'uppercase',
           language: job.subtitleLanguage || 'auto',
           fontFamily: job.subtitleFont || 'auto',
+          subtitleConfig: job.subtitleConfig || null,
           startSeconds: clipStart,
           durationSeconds: durationSeconds,
           width: dims.width,

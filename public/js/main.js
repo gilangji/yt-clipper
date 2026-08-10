@@ -81,6 +81,21 @@
   const subtitlePreviewImg = document.getElementById('subtitlePreviewImg');
   const previewBadge = document.getElementById('previewBadge');
 
+  // Auto-Clipper subtitle config (ported from auto-clipper SubtitleConfigControls)
+  const acModeKaraoke = document.getElementById('acModeKaraoke');
+  const acModeStandard = document.getElementById('acModeStandard');
+  const acModeBadge = document.getElementById('acModeBadge');
+  const acLivePreviewText = document.getElementById('acLivePreviewText');
+  const acFontFamilyBtns = document.querySelectorAll('#acFontFamilyGrid .ac-opt-btn');
+  const acFontSizeBtns = document.querySelectorAll('#acFontSizeGrid .ac-opt-btn');
+  const acFontWeightBtns = document.querySelectorAll('#acFontWeightGrid .ac-opt-btn');
+  const acUppercaseToggle = document.getElementById('acUppercaseToggle');
+  const acItalicToggle = document.getElementById('acItalicToggle');
+  const acColorSwatches = document.querySelectorAll('#acColorRow .ac-color-swatch');
+  const acColorInput = document.getElementById('acColorInput');
+  const acColorText = document.getElementById('acColorText');
+  const acHighlightLabel = document.getElementById('acHighlightLabel');
+
   // Modal 9:16 Video Preview
   const videoPreviewModal = document.getElementById('videoPreviewModal');
   const previewVideo916 = document.getElementById('previewVideo916');
@@ -142,6 +157,7 @@
   let sourceVideoFilename = null;
   let selectedHighlights = new Set(); // Set of highlight indices selected for batch export
   let cachedHighlights = [];          // Last rendered highlights array
+  let lastHighlightEngine = 'audio';  // 'ai' | 'audio' — engine terakhir dari server
 
   // ===== VU Meter (dekoratif) =====
   for (let i = 0; i < 24; i++) {
@@ -164,6 +180,41 @@
     }
     localStorage.setItem('clipreel-theme', next);
   });
+
+  // ===== Engine Status Pill (Android readiness) =====
+  const enginePill = document.getElementById('enginePill');
+  async function refreshEngineStatus() {
+    if (!enginePill) return;
+    try {
+      const r = await fetch('/api/health');
+      if (!r.ok) throw new Error('health failed');
+      const h = await r.json();
+      const depsOk = h.deps.ytdlp.available && h.deps.ffmpeg.available && h.deps.ffprobe.available;
+      if (!depsOk) {
+        enginePill.textContent = '⚠️ ffmpeg/yt-dlp?';
+        enginePill.className = 'engine-pill warn';
+        enginePill.title = 'Binary penting hilang — cek start-android.sh';
+        return;
+      }
+      if (h.whisper.installed && h.whisper.modelCached) {
+        const gem = h.gemini.keyCount > 0 ? ` · ${h.gemini.keyCount}🔑` : ' · tanpa 🔑';
+        enginePill.textContent = `✅ ${h.whisper.model}·${h.whisper.compute}${gem}`;
+        enginePill.className = 'engine-pill ok';
+        enginePill.title = 'Engine AI siap: transkrip + AI highlight berfungsi penuh';
+      } else {
+        const why = h.whisper.error ? ` — ${h.whisper.error}` : '';
+        enginePill.textContent = '⚠️ AI turun (audio saja)';
+        enginePill.className = 'engine-pill warn';
+        enginePill.title = 'Whisper tidak siap. Jalankan: bash start-android.sh' + why;
+      }
+    } catch (e) {
+      enginePill.textContent = '⚠️ API?';
+      enginePill.className = 'engine-pill warn';
+      enginePill.title = 'Gagal hubungi /api/health';
+    }
+  }
+  refreshEngineStatus();
+  setInterval(refreshEngineStatus, 30000); // refresh tiap 30 detik
 
   // ===== Toast Notification =====
   function showToast(message, type = 'info') {
@@ -711,6 +762,123 @@
     };
   }
 
+  // ===== Auto-Clipper Custom Subtitle Config (ported from auto-clipper) =====
+  function getSubtitleConfig() {
+    const style = acModeKaraoke && acModeKaraoke.classList.contains('active') ? 'karaoke' : 'standard';
+    const activeFont = document.querySelector('#acFontFamilyGrid .ac-opt-btn.active');
+    const activeSize = document.querySelector('#acFontSizeGrid .ac-opt-btn.active');
+    const activeWeight = document.querySelector('#acFontWeightGrid .ac-opt-btn.active');
+    const isUpper = acUppercaseToggle ? acUppercaseToggle.classList.contains('active') : true;
+    const isItalic = acItalicToggle ? acItalicToggle.classList.contains('active') : false;
+    let highlight = '#FFE600';
+    if (acColorText && acColorText.value) {
+      const v = acColorText.value.trim().replace(/^#/, '');
+      if (/^[0-9a-fA-F]{6}$/.test(v)) highlight = '#' + v.toUpperCase();
+    }
+    return {
+      style,
+      highlight_color: highlight,
+      font_family: activeFont ? activeFont.dataset.font : 'Arial',
+      font_size_scale: activeSize ? parseFloat(activeSize.dataset.scale) : 1.0,
+      font_weight: activeWeight ? activeWeight.dataset.weight : 'bold',
+      italic: isItalic,
+      uppercase: isUpper,
+    };
+  }
+
+  function isAutoClipperMode() {
+    return subtitleStyleSelect && subtitleStyleSelect.value === 'auto-clipper';
+  }
+
+  function getSubtitleConfigIfAuto() {
+    return isAutoClipperMode() ? getSubtitleConfig() : undefined;
+  }
+
+  function renderAcLivePreview() {
+    if (!acLivePreviewText) return;
+    const cfg = getSubtitleConfig();
+    const baseSize = 18 * cfg.font_size_scale;
+    const fontStyle = [
+      `font-family:${cfg.font_family}`,
+      `font-weight:${cfg.font_weight === 'bold' ? 700 : 400}`,
+      `font-style:${cfg.italic ? 'italic' : 'normal'}`,
+      `text-transform:${cfg.uppercase ? 'uppercase' : 'none'}`,
+      `font-size:${Math.round(baseSize)}px`,
+    ].join(';');
+    if (cfg.style === 'karaoke') {
+      acLivePreviewText.innerHTML =
+        `<span style="${fontStyle};color:#ffffff">BUAT KONTEN JADI LEBIH </span>` +
+        `<span class="ac-preview-word" style="${fontStyle};color:${cfg.highlight_color};text-shadow:0 0 10px ${cfg.highlight_color}66, 0 2px 4px rgba(0,0,0,.9), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;padding:2px 6px">VIRAL</span>` +
+        `<span style="${fontStyle};color:#ffffff"> SEKARANG</span>`;
+    } else {
+      acLivePreviewText.innerHTML =
+        `<span style="${fontStyle};color:#ffffff">Buat konten video Anda menjadi lebih menarik dan viral!</span>`;
+    }
+  }
+
+  function wireAcSubtitleControls() {
+    if (acModeKaraoke) acModeKaraoke.addEventListener('click', () => {
+      acModeKaraoke.classList.add('active');
+      if (acModeStandard) acModeStandard.classList.remove('active');
+      if (acModeBadge) acModeBadge.textContent = 'KARAOKE';
+      if (acHighlightLabel) acHighlightLabel.style.opacity = '1';
+      renderAcLivePreview();
+    });
+    if (acModeStandard) acModeStandard.addEventListener('click', () => {
+      acModeStandard.classList.add('active');
+      if (acModeKaraoke) acModeKaraoke.classList.remove('active');
+      if (acModeBadge) acModeBadge.textContent = 'STANDARD';
+      if (acHighlightLabel) acHighlightLabel.style.opacity = '0.45';
+      renderAcLivePreview();
+    });
+    acFontFamilyBtns.forEach(btn => btn.addEventListener('click', () => {
+      acFontFamilyBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderAcLivePreview();
+    }));
+    acFontSizeBtns.forEach(btn => btn.addEventListener('click', () => {
+      acFontSizeBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderAcLivePreview();
+    }));
+    acFontWeightBtns.forEach(btn => btn.addEventListener('click', () => {
+      acFontWeightBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderAcLivePreview();
+    }));
+    if (acUppercaseToggle) acUppercaseToggle.addEventListener('click', () => {
+      acUppercaseToggle.classList.toggle('active');
+      renderAcLivePreview();
+    });
+    if (acItalicToggle) acItalicToggle.addEventListener('click', () => {
+      acItalicToggle.classList.toggle('active');
+      renderAcLivePreview();
+    });
+    function setHighlightColor(color) {
+      const c = String(color || '#FFE600').toUpperCase();
+      acColorSwatches.forEach(s => {
+        s.classList.toggle('active', s.dataset.color.toUpperCase() === c);
+      });
+      if (acColorInput) acColorInput.value = /^#[0-9A-F]{6}$/i.test(c) ? c : '#FFE600';
+      if (acColorText) acColorText.value = c;
+      renderAcLivePreview();
+    }
+    acColorSwatches.forEach(s => s.addEventListener('click', () => setHighlightColor(s.dataset.color)));
+    if (acColorInput) acColorInput.addEventListener('input', (e) => setHighlightColor(e.target.value));
+    if (acColorText) acColorText.addEventListener('input', (e) => {
+      let v = e.target.value.trim();
+      if (/^[0-9a-fA-F]{6}$/.test(v)) v = '#' + v;
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+        setHighlightColor(v);
+      } else {
+        acColorSwatches.forEach(s => s.classList.remove('active'));
+        renderAcLivePreview();
+      }
+    });
+    renderAcLivePreview();
+  }
+  wireAcSubtitleControls();
+
   if (previewSubtitleBtn) {
     previewSubtitleBtn.addEventListener('click', async () => {
       const t = getActiveSubtitleTypography();
@@ -720,7 +888,7 @@
         const res = await fetch('/api/subtitle/preview', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...t, text: sampleText }),
+          body: JSON.stringify({ ...t, text: sampleText, subtitleConfig: getSubtitleConfigIfAuto() }),
         });
         if (!res.ok) throw new Error('Gagal render preview.');
         const blob = await res.blob();
@@ -736,8 +904,13 @@
         subtitlePreviewImg.src = dataUrl;
         subtitlePreviewWrap.classList.remove('hidden');
         const styleLabel = subtitleStyleSelect ? subtitleStyleSelect.options[subtitleStyleSelect.selectedIndex]?.textContent.trim() : t.style;
-        previewBadge.textContent =
+        let badgeText =
           `TEMPLATE: ${styleLabel}\nFONT: ${t.fontFamily === 'auto' ? '(dari template)' : t.fontFamily}\nSIZE: ${t.fontSize} · POS: ${t.position}`;
+        if (isAutoClipperMode()) {
+          const sc = getSubtitleConfig();
+          badgeText += `\nMODE: ${sc.style.toUpperCase()} · HIGHLIGHT: ${sc.highlight_color} · ${sc.font_family} ${sc.font_size_scale}x ${sc.font_weight}${sc.italic ? ' italic' : ''}${sc.uppercase ? ' · UPPER' : ''}`;
+        }
+        previewBadge.textContent = badgeText;
         showToast('Preview subtitle siap!', 'success');
       } catch (err) {
         showToast('Preview gagal: ' + err.message, 'error');
@@ -815,6 +988,7 @@
           subtitlePosition: t.position,
           subtitleCase: t.textCase,
           subtitleLanguage: t.language,
+          subtitleConfig: getSubtitleConfigIfAuto(),
           withSubtitle: autoSubtitleToggle ? autoSubtitleToggle.checked : true,
           aspectRatio: '9:16'
         })
@@ -935,6 +1109,7 @@
           subtitlePosition: subtitlePosSelect ? subtitlePosSelect.value : 'bottom',
           subtitleCase: subtitleCaseSelect ? subtitleCaseSelect.value : 'uppercase',
           subtitleLanguage: subtitleLangSelect ? subtitleLangSelect.value : 'auto',
+          subtitleConfig: getSubtitleConfigIfAuto(),
           bgmTrack: bgmTrackSelect ? bgmTrackSelect.value : 'none',
           bgmVolume: bgmVolumeSelect ? parseFloat(bgmVolumeSelect.value) : 0.10,
           crops: currentCrops ? [...currentCrops] : []
@@ -1982,8 +2157,10 @@
     }
 
     const userApiKey = geminiApiKeyInput ? geminiApiKeyInput.value.trim() : '';
+    const aiViralMode = document.getElementById('aiViralModeCheck');
+    const mode = aiViralMode && !aiViralMode.checked ? 'audio' : 'auto';
 
-    setButtonLoading(detectHighlightsBtn, true, 'Menganalisis audio & AI...');
+    setButtonLoading(detectHighlightsBtn, true, mode === 'auto' ? '✨ Analisis AI + transkrip...' : 'Menganalisis audio & AI...');
     try {
       const response = await apiRequest('/api/highlights', {
         method: 'POST',
@@ -1991,11 +2168,13 @@
           url: urlInput.value.trim(),
           videoPath: sourceVideoFilename,
           targetDuration: getActivePlatformDuration(),
-          apiKey: userApiKey
+          apiKey: userApiKey,
+          mode
         })
       });
 
-      const { highlights, energies } = response.data;
+      const { highlights, energies, engine } = response.data;
+      lastHighlightEngine = engine || 'audio';
 
       if (energies && energies.length > 0) {
         drawTimelineHeatmap(energies);
@@ -2016,7 +2195,12 @@
         updateRuler();
         videoElement.currentTime = topHighlight.start;
 
-        showToast(`Momen menarik terdeteksi! Timeline range telah di-update.`, 'success');
+        showToast(
+          engine === 'ai'
+            ? '✨ AI memilih momen viral dari transkrip! Timeline range di-update.'
+            : 'Momen menarik terdeteksi! Timeline range telah di-update.',
+          'success'
+        );
       } else {
         showToast('Tidak ada fluktuasi suara yang signifikan terdeteksi.', 'info');
       }
@@ -2149,7 +2333,10 @@
       font-size: 11px; color: var(--muted); padding: 0 2px 10px;
       border-bottom: 1px solid var(--border); margin-bottom: 8px;
     `;
-    summary.textContent = `${highlights.length} segmen terdeteksi · Centang untuk ekspor batch`;
+    summary.innerHTML = `${highlights.length} segmen terdeteksi · ` +
+      (lastHighlightEngine === 'ai'
+        ? '<b style="color:#8b5cf6">✨ AI Transcript</b> · Centang untuk ekspor batch'
+        : 'Analisis audio-energy · Centang untuk ekspor batch');
     highlightsList.appendChild(summary);
 
 
@@ -2508,6 +2695,7 @@
       const subtitleStyle = subtitleStyleSelect ? subtitleStyleSelect.value : 'quick-brown-inv';
       const subtitleLanguage = subtitleLangSelect ? subtitleLangSelect.value : 'auto';
       const subtitleFont = subtitleFontSelect ? subtitleFontSelect.value : 'auto';
+      const subtitleConfig = getSubtitleConfigIfAuto();
 
       try {
         const { data } = await apiRequest('/api/clip', {
@@ -2527,6 +2715,7 @@
             subtitleStyle,
             subtitleLanguage,
             subtitleFont,
+            subtitleConfig,
           }),
         });
 
@@ -2592,6 +2781,7 @@
     const subtitleCase = subtitleCaseSelect ? subtitleCaseSelect.value : 'uppercase';
     const subtitleLanguage = subtitleLangSelect ? subtitleLangSelect.value : 'auto';
     const subtitleFont = subtitleFontSelect ? subtitleFontSelect.value : 'auto';
+    const subtitleConfig = getSubtitleConfigIfAuto();
     const bgmTrack = bgmTrackSelect ? bgmTrackSelect.value : 'none';
     const bgmVolume = bgmVolumeSelect ? parseFloat(bgmVolumeSelect.value) : 0.10;
 
@@ -2635,6 +2825,7 @@
             subtitleCase,
             subtitleLanguage,
             subtitleFont,
+            subtitleConfig,
             clipTitle: q.title || '',
             clipTags: q.tags || '',
             clipDescription: q.description || '',
@@ -2803,6 +2994,7 @@
     const subtitleCase = subtitleCaseSelect ? subtitleCaseSelect.value : 'uppercase';
     const subtitleLanguage = subtitleLangSelect ? subtitleLangSelect.value : 'auto';
     const subtitleFont = subtitleFontSelect ? subtitleFontSelect.value : 'auto';
+    const subtitleConfig = getSubtitleConfigIfAuto();
     const headline = headlineInput.value.trim();
     const clipTitle = metaClipTitle ? metaClipTitle.value.trim() : '';
     const clipTags = metaClipTags ? metaClipTags.value.trim() : '';
@@ -2850,6 +3042,7 @@
           subtitleCase,
           subtitleLanguage,
           subtitleFont,
+          subtitleConfig,
           clipTitle,
           clipTags,
           clipDescription,

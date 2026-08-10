@@ -486,4 +486,74 @@ function detectHighlights(videoPath, baseVideoTitle = '', options = {}) {
   });
 }
 
-module.exports = { detectHighlights };
+/**
+ * AI Transcript-Based Highlight Detection — ala auto-clipper (✨ Generate Viral Clips).
+ *
+ * Pipeline: transkripsi video → SRT (faster-whisper) → LLM memilih momen viral
+ * berdasarkan KONTEN (hook 2 detik pertama, kalimat lengkap, jeda bicara presisi).
+ * Bila transkripsi atau LLM gagal → resolve null, controller fallback ke
+ * detectHighlights() (audio-energy).
+ */
+function detectHighlightsWithAI(videoPath, baseVideoTitle = '', options = {}) {
+  return new Promise(async (resolve) => {
+    const targetDuration = parseInt(options.targetDuration, 10) || DEFAULT_TARGET_DURATION;
+    const maxHighlights = parseInt(options.maxHighlights, 10) || 8;
+    const apiKey = options.apiKey || null;
+    const extraPrompt = options.extraPrompt || '';
+    const language = options.language || 'auto';
+
+    try {
+      const aiHighlights = require('./aiHighlights.service');
+
+      logger.info('AI Highlights: transkripsi video ke SRT (faster-whisper)...', { videoPath, language });
+      const srtPath = await aiHighlights.transcribeToSrtFile(videoPath, language);
+      if (!srtPath) {
+        logger.warn('AI Highlights: transkripsi gagal → fallback ke audio-energy.');
+        return resolve(null);
+      }
+
+      const items = await aiHighlights.selectHighlightsWithLLM({
+        srtPath,
+        videoTitle: baseVideoTitle,
+        apiKey,
+        extraPrompt,
+        limit: maxHighlights,
+        targetDuration,
+      });
+      try { fs.unlinkSync(srtPath); } catch (e) {}
+
+      if (!items || items.length === 0) {
+        logger.warn('AI Highlights: LLM tidak menemukan highlight → fallback ke audio-energy.');
+        return resolve(null);
+      }
+
+      const highlights = aiHighlights.buildHighlightObjects(items, {
+        videoTitle: baseVideoTitle,
+        targetDuration,
+        maxHighlights,
+        viralLabelFn: viralLabel,
+      });
+
+      if (highlights.length === 0) return resolve(null);
+
+      // Lengkapi social metadata (autoTitle/autoTags/autoDescription/highlightPoints)
+      // via aiService.enhanceHighlightsWithAI — momen AI dapat judul & caption viral.
+      try {
+        const aiService = require('./ai.service');
+        const enriched = await aiService.enhanceHighlightsWithAI(highlights, baseVideoTitle || 'Video', apiKey);
+        if (Array.isArray(enriched) && enriched.length > 0) {
+          return resolve({ highlights: enriched, energies: [], engine: 'ai' });
+        }
+      } catch (enhErr) {
+        logger.warn('AI Highlights: enhancement metadata gagal, pakai metadata dasar:', enhErr.message);
+      }
+
+      resolve({ highlights, energies: [], engine: 'ai' });
+    } catch (err) {
+      logger.warn('AI Highlights error → fallback ke audio-energy:', err.message);
+      resolve(null);
+    }
+  });
+}
+
+module.exports = { detectHighlights, detectHighlightsWithAI, viralLabel, generateMetadataForHighlight };
