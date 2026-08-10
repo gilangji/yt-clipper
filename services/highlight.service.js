@@ -228,18 +228,23 @@ function calcRelativeScores(metrics, targetDuration, totalSecs) {
  * 3. Duration Fit (20%) - 25s - 60s adalah golden ratio
  * 4. Pacing & Variance (20%) - fluktuasi penahan retensi
  */
-function viralLabel(score, hookScore = 80, energyScore = 80, pacingScore = 80, index = 0) {
+function viralLabel(score, hookScore = 80, energyScore = 80, pacingScore = 80, index = 0, startSec = 0, endSec = 60) {
+  const dur = Math.round(endSec - startSec);
+  const startMin = Math.floor(startSec / 60);
+  const startS = Math.floor(startSec % 60);
+  const timeStr = `${startMin}:${startS < 10 ? '0' : ''}${startS}`;
+
   if (score >= 88) {
     return {
       label: 'VIRAL MAGNET',
       emoji: '🔥',
       color: '#ef4444',
       grade: 'S',
-      reason: 'Hook pembuka sangat kuat & dinamika suara tinggi menahan retensi 3 detik pertama algoritma TikTok/Shorts.',
-      highlightsPoints: [
-        '⚡ Lonjakan energi vokal di detik awal (High Hook Power)',
-        '🎯 Topik bahasan langsung to-the-point tanpa basa-basi',
-        '📈 Potensi retensi & share rate tertinggi (Viral Grade S)'
+      reason: `Segmen menit ${timeStr} (durasi ${dur}s) memiliki intensitas audio dan lonjakan daya pikat tertinggi (Hook Score: ${hookScore}/100) yang berpotensi menahan penonton di 3 detik pertama.`,
+      highlightPoints: [
+        `⚡ Lonjakan vokal terkuat di menit ${timeStr} (Hook Power: ${hookScore}%)`,
+        `📈 Dinamika ritme suara & pacing tinggi (${pacingScore}% korelasi retensi)`,
+        `🚀 Segmen prioritas utama dengan proyeksi share rate tertinggi`
       ]
     };
   }
@@ -249,11 +254,11 @@ function viralLabel(score, hookScore = 80, energyScore = 80, pacingScore = 80, i
       emoji: '⭐',
       color: '#f97316',
       grade: 'A',
-      reason: 'Materi padat, intonasi vokal jelas dan durasi sangat ideal untuk format video pendek.',
-      highlightsPoints: [
-        '💡 Pembahasan inti dengan artikulasi jelas & meyakinkan',
-        '⏱ Pacing percakapan stabil dan nyaman didengarkan',
-        '🚀 Potensi engagement komentar tinggi'
+      reason: `Pembahasan pada menit ${timeStr} memiliki intonasi vokal yang sangat jelas dan tempo pembicaraan yang ideal (Energy Score: ${energyScore}/100) untuk format Reels & TikTok.`,
+      highlightPoints: [
+        `💡 Intonasi pembicaraan padat dan berbobot di menit ${timeStr}`,
+        `⏱ Pacing stabil (${pacingScore}%) dengan artikulasi vokal jernih`,
+        `💬 Potensi interaksi kolom komentar tinggi`
       ]
     };
   }
@@ -263,10 +268,10 @@ function viralLabel(score, hookScore = 80, energyScore = 80, pacingScore = 80, i
       emoji: '⚡',
       color: '#eab308',
       grade: 'B',
-      reason: 'Alur cerita menarik dengan tempo pembicaraan yang konsisten dan informatif.',
-      highlightsPoints: [
-        '📖 Penjelasan konsep dengan alur cerita yang menarik',
-        '🔄 Transisi topik yang halus dan mudah dipahami'
+      reason: `Cuplikan menit ${timeStr} menyajikan alur pembacaan materi yang konsisten dan menarik untuk didengarkan hingga akhir segmen (${dur}s).`,
+      highlightPoints: [
+        `📖 Penjelasan konteks materi yang berkesinambungan di menit ${timeStr}`,
+        `🔄 Alur transisi antar kalimat yang halus dan alami`
       ]
     };
   }
@@ -276,9 +281,9 @@ function viralLabel(score, hookScore = 80, energyScore = 80, pacingScore = 80, i
       emoji: '📌',
       color: '#22c55e',
       grade: 'C',
-      reason: 'Segmen edukatif/kontekstual yang cocok untuk melengkapi pembahasan utama.',
-      highlightsPoints: [
-        '📝 Penjelasan latar belakang & konteks materi'
+      reason: `Segmen pada menit ${timeStr} memberikan latar belakang informatif yang cocok sebagai pendukung klip utama.`,
+      highlightPoints: [
+        `📝 Penjelasan latar belakang dan pembuka pembahasan di menit ${timeStr}`
       ]
     };
   }
@@ -287,8 +292,8 @@ function viralLabel(score, hookScore = 80, energyScore = 80, pacingScore = 80, i
     emoji: '📖',
     color: '#6b7280',
     grade: 'D',
-    reason: 'Bagian pengantar atau penjelasan umum.',
-    highlightsPoints: ['📌 Segmen informatif umum']
+    reason: `Segmen informatif umum pada menit ${timeStr}.`,
+    highlightPoints: [`📌 Segmen pembuka/penutup pada menit ${timeStr}`]
   };
 }
 
@@ -320,7 +325,7 @@ function assignScoresAndMetadata(segments, smoothed, globalAvgEnergy, baseVideoT
 
   const scored = segments.map((seg, i) => {
     const scores = scoreList[i];
-    const rating = viralLabel(scores.totalScore, scores.hookScore, scores.energyScore, scores.pacingScore, i);
+    const rating = viralLabel(scores.totalScore, scores.hookScore, scores.energyScore, scores.pacingScore, i, seg.start, seg.end);
     const meta = generateMetadataForHighlight(seg, i, baseVideoTitle);
 
     return {
@@ -333,7 +338,7 @@ function assignScoresAndMetadata(segments, smoothed, globalAvgEnergy, baseVideoT
       viralEmoji: rating.emoji,
       viralColor: rating.color,
       analysisReason: rating.reason,
-      highlightPoints: rating.highlightsPoints,
+      highlightPoints: rating.highlightPoints,
       hookScore: scores.hookScore,
       energyScore: scores.energyScore,
       pacingScore: scores.pacingScore,
