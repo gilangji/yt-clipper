@@ -76,6 +76,64 @@ function transcribeSegment({ videoPath, startSeconds = 0, durationSeconds, langu
 }
 
 /**
+ * Transkripsi FULL video dengan timestamp segments (Vizard-style transcript editor).
+ * @param {object} params
+ * @param {string} params.videoPath - path absolut video sumber
+ * @param {string} [params.language='auto']
+ * @returns {Promise<{text: string, segments: Array<{start:number,end:number,text:string}>, language: string}>}
+ */
+function transcribeFullWithSegments({ videoPath, language = 'auto' }) {
+  return new Promise((resolve, reject) => {
+    const runId = uuidv4();
+    const configPath = path.join(config.folders.temp, `trcfg_${runId}.json`);
+    const outputJsonPath = path.join(config.folders.temp, `tr_${runId}.json`);
+
+    if (!fs.existsSync(config.folders.temp)) {
+      fs.mkdirSync(config.folders.temp, { recursive: true });
+    }
+
+    const configData = {
+      inputMedia: videoPath,
+      outputJson: outputJsonPath,
+      language,
+      ffmpegPath: config.binaries.ffmpeg || 'ffmpeg'
+    };
+
+    fs.writeFileSync(configPath, JSON.stringify(configData));
+
+    const pythonBin = config.binaries.python || 'python3';
+    const scriptPath = path.join(__dirname, '../utils/transcriber.py');
+    const child = spawn(pythonBin, [scriptPath, configPath]);
+
+    let stderr = '';
+    child.stderr.on('data', (d) => { stderr += d.toString(); });
+
+    child.on('close', (code) => {
+      if (fs.existsSync(configPath)) {
+        try { fs.unlinkSync(configPath); } catch (e) {}
+      }
+
+      if (code !== 0 || !fs.existsSync(outputJsonPath)) {
+        reject(new Error(stderr || 'Whisper transcription failed'));
+        return;
+      }
+
+      try {
+        const data = JSON.parse(fs.readFileSync(outputJsonPath, 'utf-8'));
+        fs.unlinkSync(outputJsonPath);
+        resolve({
+          text: (data.text || '').trim(),
+          segments: Array.isArray(data.segments) ? data.segments : [],
+          language: data.language || language,
+        });
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
+/**
  * Susun judul click-worthy dari keyword utama + konteks segmen.
  */
 function buildTitle({ keywords, videoTitle, durationSeconds }) {
@@ -177,4 +235,4 @@ async function generateContentMetadata({ videoPath, startSeconds = 0, endSeconds
   return { title, tags, description, headline, keywords, transcript };
 }
 
-module.exports = { generateContentMetadata, transcribeSegment };
+module.exports = { generateContentMetadata, transcribeSegment, transcribeFullWithSegments };

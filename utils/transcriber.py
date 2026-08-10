@@ -62,73 +62,83 @@ STYLES = {
         'alignment': 2,                 # Bottom-center
         'margin_v': 75
     },
-    'neon-green': {
-        'name': 'NeonGreen',
-        'font': 'Arial',
-        'fontsize': 24,
-        'primary_color': '&H0000FF55',   # Neon Lime Green
-        'secondary_color': '&H00FFFFFF', # White
-        'outline_color': '&H00000000',
-        'back_color': '&H80000000',
-        'bold': 1,
-        'outline': 3.8,
-        'shadow': 1.8,
-        'alignment': 2,
-        'margin_v': 75
-    },
-    'cyan-blue': {
-        'name': 'CyanBlue',
-        'font': 'Arial',
-        'fontsize': 24,
-        'primary_color': '&H00FFFF00',   # Cyan Blue
-        'secondary_color': '&H00FFFFFF', # White
-        'outline_color': '&H00000000',
-        'back_color': '&H80000000',
-        'bold': 1,
-        'outline': 3.8,
-        'shadow': 1.8,
-        'alignment': 2,
-        'margin_v': 75
-    },
-    'impact-red': {
-        'name': 'ImpactRed',
-        'font': 'Arial',
+    'vizard-classic': {
+        'name': 'VizardClassic',
+        'font': 'Montserrat',
         'fontsize': 25,
-        'primary_color': '&H003333FF',   # Vibrant Red
-        'secondary_color': '&H0000FFFF', # Yellow
-        'outline_color': '&H00000000',
-        'back_color': '&H90000000',
-        'bold': 1,
-        'outline': 4.0,
-        'shadow': 2.0,
-        'alignment': 2,
-        'margin_v': 75
-    },
-    'golden-luxury': {
-        'name': 'GoldenLuxury',
-        'font': 'Arial',
-        'fontsize': 23,
-        'primary_color': '&H0033CCFF',   # Warm Gold
-        'secondary_color': '&H00FFFFFF', # White
-        'outline_color': '&H00111111',
-        'back_color': '&H80000000',
+        'primary_color': '&H00FFFFFF',   # Putih bersih
+        'secondary_color': '&H00FFFFFF',
+        'outline_color': '&H00000000',   # Outline hitam tegas
+        'back_color': '&H64000000',
         'bold': 1,
         'outline': 3.5,
-        'shadow': 2.0,
+        'shadow': 0.5,
         'alignment': 2,
         'margin_v': 75
     },
-    'clean-white': {
-        'name': 'CleanWhite',
-        'font': 'Arial',
-        'fontsize': 22,
-        'primary_color': '&H00FFFFFF',   # White
-        'secondary_color': '&H0000FFFF', # Yellow secondary
+    'vizard-pop': {
+        'name': 'VizardPop',
+        'font': 'Anton',
+        'fontsize': 30,
+        'primary_color': '&H00FFFFFF',   # Putih dasar
+        'secondary_color': '&H0000D4FF', # Kuning aktif — kata menyala
         'outline_color': '&H00000000',
-        'back_color': '&H90000000',
+        'back_color': '&H64000000',
         'bold': 1,
-        'outline': 3.2,
-        'shadow': 2.0,
+        'outline': 4.0,
+        'shadow': 0.0,
+        'alignment': 2,
+        'margin_v': 70,
+        'caption_mode': 'word',
+        'word_style': 'alternate'        # pop per kata putih/kuning ala Hormozi
+    },
+    'vizard-neon': {
+        'name': 'VizardNeon',
+        'font': 'Oswald',
+        'fontsize': 28,
+        'primary_color': '&H00FFFFFF',
+        'secondary_color': '&H00FFE500', # Cyan #00E5FF
+        'outline_color': '&H00FFE500',   # Outline cyan = inti glow
+        'back_color': '&H8AFFE500',      # Shadow cyan = halo glow
+        'bold': 1,
+        'outline': 5.0,
+        'shadow': 0.0,
+        'alignment': 2,
+        'margin_v': 75
+    },
+    'vizard-gradient': {
+        'name': 'VizardGradient',
+        'font': 'Poppins',
+        'fontsize': 26,
+        'primary_color': '&H00FFFFFF',
+        'secondary_color': '&H00FFFFFF',
+        'outline_color': '&H00000000',
+        'back_color': '&H64000000',
+        'bold': 1,
+        'outline': 2.5,
+        'shadow': 1.0,
+        'alignment': 2,
+        'margin_v': 75,
+        'caption_mode': 'word',
+        'word_style': 'rainbow',          # sweep gradasi hangat per kata
+        'rainbow_colors': [
+            '&H00FFFFFF',  # putih
+            '&H0000D4FF',  # kuning #FFD400
+            '&H00008AFF',  # oranye #FF8A00
+            '&H003333FF',  # merah #FF3333
+        ]
+    },
+    'vizard-outline': {
+        'name': 'VizardOutline',
+        'font': 'Archivo Black',
+        'fontsize': 28,
+        'primary_color': '&H00FFFFFF',
+        'secondary_color': '&H00FFFFFF',
+        'outline_color': '&H00000000',
+        'back_color': '&H64000000',
+        'bold': 1,
+        'outline': 6.5,                  # big block — outline sangat tebal
+        'shadow': 1.5,
         'alignment': 2,
         'margin_v': 75
     },
@@ -465,17 +475,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     return header
 
 EMOJI_RULES = {
-    'uang': '💵 UANG', 'money': '💵 MONEY', 'kaya': '💰 KAYA', 'rich': '💰 RICH', 'dolar': '💵 DOLAR', 'harga': '🏷️ HARGA',
-    'sukses': '🚀 SUKSES', 'success': '🚀 SUCCESS', 'menang': '🏆 MENANG', 'juara': '🏆 JUARA',
-    'semangat': '🔥 SEMANGAT', 'fire': '🔥 FIRE', 'viral': '🔥 VIRAL', 'hot': '🔥 HOT', 'api': '🔥 API',
-    'otak': '🧠 OTAK', 'brain': '🧠 BRAIN', 'pikir': '🧠 PIKIR', 'mindset': '🧠 MINDSET', 'fakta': '💡 FAKTA', 'ide': '💡 IDE', 'tahu': '💡 TAHU', 'trik': '💡 TRIK', 'solusi': '💡 SOLUSI',
-    'waktu': '⏱️ WAKTU', 'time': '⏱️ TIME', 'jam': '⏱️ JAM', 'cepat': '⚡ CEPAT', 'fast': '⚡ FAST',
-    'rahasia': '🤫 RAHASIA', 'secret': '🤫 SECRET', 'diam': '🤫 DIAM', 'kunci': '🔑 KUNCI',
-    'salah': '❌ SALAH', 'gagal': '❌ GAGAL', 'stop': '❌ STOP', 'jangan': '❌ JANGAN',
-    'target': '🎯 TARGET', 'fokus': '🎯 FOKUS', 'goal': '🎯 GOAL',
-    'bahaya': '⚠️ BAHAYA', 'warning': '⚠️ WARNING', 'rusak': '⚠️ RUSAK', 'error': '⚠️ ERROR',
-    'cinta': '❤️ CINTA', 'love': '❤️ LOVE', 'suka': '❤️ SUKA',
-    'tidur': '😴 TIDUR', 'sleep': '😴 SLEEP', 'kaget': '😱 KAGET', 'takut': '😱 TAKUT', 'raja': '👑 RAJA', 'king': '👑 KING'
+    'uang': '💵 UANG', 'money': '💵 MONEY', 'kaya': '💰 KAYA', 'rich': '💰 RICH', 'dolar': '💵 DOLAR', 'harga': '🏷️ HARGA', 'bisnis': '💼 BISNIS', 'investasi': '📈 INVESTASI', 'untung': '💹 UNTUNG', 'profit': '💹 PROFIT',
+    'sukses': '🚀 SUKSES', 'success': '🚀 SUCCESS', 'menang': '🏆 MENANG', 'juara': '🏆 JUARA', 'hebat': '⭐ HEBAT', 'bisa': '💪 BISA', 'kuat': '💪 KUAT',
+    'semangat': '🔥 SEMANGAT', 'fire': '🔥 FIRE', 'viral': '🔥 VIRAL', 'hot': '🔥 HOT', 'api': '🔥 API', 'gila': '🤪 GILA', 'booming': '💥 BOOMING',
+    'otak': '🧠 OTAK', 'brain': '🧠 BRAIN', 'pikir': '🧠 PIKIR', 'mindset': '🧠 MINDSET', 'fakta': '💡 FAKTA', 'ide': '💡 IDE', 'tahu': '💡 TAHU', 'trik': '💡 TRIK', 'solusi': '💡 SOLUSI', 'ilmu': '📚 ILMU', 'belajar': '📚 BELAJAR',
+    'waktu': '⏱️ WAKTU', 'time': '⏱️ TIME', 'jam': '⏱️ JAM', 'cepat': '⚡ CEPAT', 'fast': '⚡ FAST', 'sekarang': '⚡ SEKARANG',
+    'rahasia': '🤫 RAHASIA', 'secret': '🤫 SECRET', 'diam': '🤫 DIAM', 'kunci': '🔑 KUNCI', 'privasi': '🔒 PRIVASI',
+    'salah': '❌ SALAH', 'gagal': '❌ GAGAL', 'stop': '❌ STOP', 'jangan': '❌ JANGAN', 'rugi': '📉 RUGI',
+    'target': '🎯 TARGET', 'fokus': '🎯 FOKUS', 'goal': '🎯 GOAL', 'tujuan': '🎯 TUJUAN',
+    'bahaya': '⚠️ BAHAYA', 'warning': '⚠️ WARNING', 'rusak': '⚠️ RUSAK', 'error': '⚠️ ERROR', 'peringatan': '⚠️ PERINGATAN',
+    'cinta': '❤️ CINTA', 'love': '❤️ LOVE', 'suka': '❤️ SUKA', 'hati': '❤️ HATI',
+    'tidur': '😴 TIDUR', 'sleep': '😴 SLEEP', 'kaget': '😱 KAGET', 'takut': '😱 TAKUT', 'raja': '👑 RAJA', 'king': '👑 KING',
+    'hp': '📱 HP', 'telepon': '📱 TELEPON', 'video': '📹 VIDEO', 'ai': '🤖 AI', 'robot': '🤖 ROBOT', 'dunia': '🌍 DUNIA', 'dosa': '☠️ DOSA'
 }
 
 def inject_emojis_to_text(text):
@@ -526,10 +537,16 @@ def transcribe_to_json(audio_path, output_json_path, language=None):
         vad_parameters=dict(min_silence_duration_ms=300)
     )
     texts = []
+    seg_list = []
     for segment in segments:
         t = (segment.text or '').strip()
         if t:
             texts.append(t)
+            seg_list.append({
+                'start': round(float(segment.start), 2),
+                'end': round(float(segment.end), 2),
+                'text': t,
+            })
     full_text = " ".join(texts)
     detected = getattr(info, 'language', language or 'auto')
     translated_text = full_text
@@ -546,6 +563,7 @@ def transcribe_to_json(audio_path, output_json_path, language=None):
         'keywords': extract_keywords(full_text),
         'language': detected,
         'targetLanguage': language if (language and language != 'auto') else None,
+        'segments': seg_list,
     }
     with open(output_json_path, 'w', encoding='utf-8') as f:
         json.dump(result, f, ensure_ascii=False, indent=2)

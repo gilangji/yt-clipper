@@ -17,6 +17,11 @@
   let activeSpeaker = null;
   let lastFocusCx = 0.5;
   let lastFocusCy = 0.5;
+  // State untuk velocity prediction (kamkera antisipasi gerak karakter, tidak tertinggal)
+  let lastFaceCx = null;
+  let lastFaceCy = null;
+  let velCx = 0;
+  let velCy = 0;
   let heatmapHistory = [];
   const HEATMAP_MAX_HISTORY = 20;
 
@@ -169,36 +174,66 @@
     setTimeout(() => el.remove(), 5000);
   }
 
-  // ===== Load BlazeFace Model =====
-  async function loadAIModel() {
-    try {
-      // Guard: tf and blazeface must be available from CDN scripts
-      if (typeof tf === 'undefined' || typeof blazeface === 'undefined') {
-        throw new Error('TensorFlow.js atau BlazeFace belum termuat dari CDN.');
-      }
-      aiStatus.textContent = 'AI LOADING...';
-      await tf.ready();
-      faceModel = await blazeface.load({ modelUrl: '/model/blazeface/model.json' });
-      modelReady = true;
-      aiStatus.textContent = 'AI ONLINE';
-      aiStatus.style.borderColor = 'var(--accent)';
-      aiStatus.style.color = 'var(--accent)';
-      showToast('Model deteksi wajah BlazeFace berhasil dimuat.', 'success');
-    } catch (err) {
-      console.error(err);
-      aiStatus.textContent = 'AI ERROR';
-      aiStatus.style.borderColor = 'var(--amber, #f59e0b)';
-      aiStatus.style.color = 'var(--amber, #f59e0b)';
-      showToast('AI Error: ' + err.message, 'error');
-    }
+  // ===== Lazy-load script (tf.js/blazeface dimuat on-demand, bukan saat page load) =====
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Gagal memuat ' + src));
+      document.head.appendChild(s);
+    });
   }
 
-  // Defer until all external scripts are done loading
-  if (document.readyState === 'complete') {
-    loadAIModel();
-  } else {
-    window.addEventListener('load', loadAIModel);
+  // ===== Load BlazeFace Model (LAZY + idempotent) =====
+  // Dipicu dari 3 titik: video dimuat, video diputar, & saat scan wajah dibutuhkan.
+  // Semua pemicu berbagi satu promise → tidak pernah download tf.js dua kali.
+  let aiLoadPromise = null;
+  function loadAIModel() {
+    if (!aiLoadPromise) {
+      aiLoadPromise = (async () => {
+        try {
+          // TensorFlow.js + BlazeFace di-inject on-demand → halaman awal tetap ringan
+          if (typeof tf === 'undefined') {
+            await loadScript('/js/tf.min.js');
+          }
+          if (typeof blazeface === 'undefined') {
+            await loadScript('/js/blazeface.min.js');
+          }
+          if (typeof tf === 'undefined' || typeof blazeface === 'undefined') {
+            throw new Error('TensorFlow.js atau BlazeFace belum termuat.');
+          }
+          aiStatus.textContent = 'AI LOADING...';
+          await tf.ready();
+          faceModel = await blazeface.load({ modelUrl: '/model/blazeface/model.json' });
+          modelReady = true;
+          aiStatus.textContent = 'AI ONLINE';
+          aiStatus.style.borderColor = 'var(--accent)';
+          aiStatus.style.color = 'var(--accent)';
+          showToast('Model deteksi wajah BlazeFace berhasil dimuat.', 'success');
+        } catch (err) {
+          console.error(err);
+          aiStatus.textContent = 'AI ERROR';
+          aiStatus.style.borderColor = 'var(--amber, #f59e0b)';
+          aiStatus.style.color = 'var(--amber, #f59e0b)';
+          showToast('AI Error: ' + err.message, 'error');
+          // Reset agar bisa dicoba ulang di pemicu berikutnya
+          aiLoadPromise = null;
+        }
+      })();
+    }
+    return aiLoadPromise;
   }
+
+  // Jamin model AI siap — await sampai tf.js + BlazeFace + model.json termuat.
+  // Dipakai scanFacesInRange supaya ekspor TIDAK PERNAH batal diam-diam.
+  async function ensureAIModel() {
+    await loadAIModel();
+    return { ready: modelReady, faceModel };
+  }
+
+  // TIDAK auto-load di window load lagi — model AI dipanaskan saat video dimuat
+  // (setupLoadedVideo) & saat video diputar. Halaman awal tetap ringan.
 
   // ===== Drag & Drop URL =====
   ['dragenter', 'dragover'].forEach((evt) =>
@@ -275,6 +310,124 @@
     rulerSelection.style.left = `${leftPct}%`;
     rulerSelection.style.right = `${rightPct}%`;
   }
+
+  // ===== Vizard-style Transcript Editor (klik kalimat → potong) =====
+  const transcriptContainer = document.getElementById('transcriptContainer');
+  const loadTranscriptBtn = document.getElementById('loadTranscriptBtn');
+  const copyTranscriptBtn = document.getElementById('copyTranscriptBtn');
+  const transcriptStatus = document.getElementById('transcriptStatus');
+  const transcriptList = document.getElementById('transcriptList');
+  let transcriptSegments = [];
+  let lastActiveTranscriptIdx = -1;
+
+  async function loadTranscript() {
+    if (!sourceVideoFilename) {
+      showToast('Video preview belum siap. Tunggu unduhan selesai.', 'error');
+      return;
+    }
+    try {
+      loadTranscriptBtn.disabled = true;
+      loadTranscriptBtn.innerHTML = '⏳ Mentranskripsi…';
+      transcriptStatus.classList.remove('hidden');
+      transcriptList.classList.add('hidden');
+      transcriptStatus.textContent = 'Mentranskripsi audio dengan Whisper… (bisa 1–3 menit)';
+
+      const resp = await fetch('/api/transcript', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: urlInput.value.trim(),
+          videoPath: sourceVideoFilename,
+          language: subtitleLangSelect ? subtitleLangSelect.value : 'auto',
+        }),
+      });
+      const json = await resp.json();
+      if (!json.success) throw new Error(json.message || 'Transkripsi gagal');
+
+      transcriptSegments = json.data.segments || [];
+      renderTranscript();
+      transcriptContainer.classList.remove('hidden');
+      showToast(`Transkrip siap: ${transcriptSegments.length} kalimat. Klik untuk potong!`, 'success');
+    } catch (err) {
+      transcriptStatus.textContent = 'Gagal memuat transkrip: ' + err.message;
+      showToast('Gagal memuat transkrip: ' + err.message, 'error');
+    } finally {
+      loadTranscriptBtn.disabled = false;
+      loadTranscriptBtn.innerHTML = '🔄 Muat Transkrip';
+    }
+  }
+
+  function renderTranscript() {
+    transcriptList.innerHTML = '';
+    transcriptStatus.classList.add('hidden');
+    transcriptList.classList.remove('hidden');
+    lastActiveTranscriptIdx = -1;
+
+    transcriptSegments.forEach((seg, i) => {
+      const row = document.createElement('div');
+      row.className = 't-row';
+      row.dataset.idx = i;
+
+      const time = document.createElement('span');
+      time.className = 't-time';
+      time.textContent = secondsToTime(seg.start);
+
+      const text = document.createElement('span');
+      text.className = 't-text';
+      text.textContent = seg.text;
+
+      row.appendChild(time);
+      row.appendChild(text);
+
+      row.addEventListener('click', () => {
+        startInput.value = secondsToTime(seg.start);
+        endInput.value = secondsToTime(Math.min(seg.end, currentVideoDuration || seg.end));
+        updateRuler();
+        if (videoElement && sourceVideoFilename) {
+          videoElement.currentTime = seg.start;
+        }
+        transcriptList.querySelectorAll('.t-row').forEach(r => r.classList.remove('active'));
+        row.classList.add('active');
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        showToast(`Rentang di-set: ${secondsToTime(seg.start)} — ${secondsToTime(seg.end)}`, 'info');
+      });
+
+      transcriptList.appendChild(row);
+    });
+
+    if (videoElement) videoElement.addEventListener('timeupdate', syncTranscriptHighlight);
+  }
+
+  function syncTranscriptHighlight() {
+    if (!transcriptSegments.length || !videoElement) return;
+    const t = videoElement.currentTime;
+    let idx = transcriptSegments.findIndex(s => t >= s.start && t < s.end);
+    if (idx === -1) {
+      for (let i = transcriptSegments.length - 1; i >= 0; i--) {
+        if (transcriptSegments[i].start <= t) { idx = i; break; }
+      }
+    }
+    if (idx !== -1 && idx !== lastActiveTranscriptIdx) {
+      lastActiveTranscriptIdx = idx;
+      const rows = transcriptList.querySelectorAll('.t-row');
+      rows.forEach((r, i) => r.classList.toggle('active', i === idx));
+      if (rows[idx]) rows[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  if (loadTranscriptBtn) loadTranscriptBtn.addEventListener('click', loadTranscript);
+  if (copyTranscriptBtn) {
+    copyTranscriptBtn.addEventListener('click', async () => {
+      const full = transcriptSegments.map(s => `${secondsToTime(s.start)} ${s.text}`).join('\n');
+      try {
+        await navigator.clipboard.writeText(full || '');
+        showToast('Transkrip disalin ke clipboard!', 'success');
+      } catch (e) {
+        showToast('Gagal menyalin: ' + e.message, 'error');
+      }
+    });
+  }
+
   // ===== Platform Preset Buttons & Durasi Kustom =====
   platformPresetBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1165,18 +1318,36 @@
           targetLandmarks = activeSpeaker.landmarks;
         }
 
-        // Smoothing (Exponential Moving Average) untuk mencegah kamera berguncang
-        const smoothBeta = 0.06;
-        const deadband = 0.04; // 4% deadband threshold to prevent jitter/micro-movements
-        
+        // ===== Adaptive Smoothing + Velocity Prediction =====
+        // Kamera tidak boleh "malas" mengejar: kalau karakter jauh dari fokus,
+        // beta naik (kejar agresif); kalau sudah dekat, beta turun (stabil).
+        const dist = Math.hypot(targetCx - lastFocusCx, targetCy - lastFocusCy);
+        let beta;
+        if (dist > 0.15) beta = 0.40;       // karakter jauh → kejar cepat
+        else if (dist > 0.07) beta = 0.25;  // sedang → responsif
+        else beta = 0.12;                   // dekat → halus anti-guncang
+
+        const deadband = 0.015; // 1.5% — mulai bergerak lebih cepat (sebelumnya 4%)
+
+        // Estimasi kecepatan gerak wajah (EMA) untuk prediksi posisi ~2 frame ke depan
+        if (lastFaceCx !== null) {
+          velCx = 0.6 * velCx + 0.4 * (targetCx - lastFaceCx);
+          velCy = 0.6 * velCy + 0.4 * (targetCy - lastFaceCy);
+        }
+        lastFaceCx = targetCx;
+        lastFaceCy = targetCy;
+
+        const predCx = targetCx + velCx * 2.0;
+        const predCy = targetCy + velCy * 2.0;
+
         let smoothedCx = lastFocusCx;
         let smoothedCy = lastFocusCy;
-        
-        if (Math.abs(targetCx - lastFocusCx) > deadband) {
-          smoothedCx = lastFocusCx + smoothBeta * (targetCx - lastFocusCx);
+
+        if (Math.abs(predCx - lastFocusCx) > deadband) {
+          smoothedCx = lastFocusCx + beta * (predCx - lastFocusCx);
         }
-        if (Math.abs(targetCy - lastFocusCy) > deadband) {
-          smoothedCy = lastFocusCy + smoothBeta * (targetCy - lastFocusCy);
+        if (Math.abs(predCy - lastFocusCy) > deadband) {
+          smoothedCy = lastFocusCy + beta * (predCy - lastFocusCy);
         }
 
         lastFocusCx = smoothedCx;
@@ -1260,11 +1431,25 @@
   }
 
   async function scanFacesInRange(startSec, endSec) {
-    if (!faceModel) return;
+    // JAMINAN: jangan pernah batal diam-diam. Kalau model belum siap, muat dulu.
+    if (!faceModel) {
+      showToast('🤖 Memuat model AI deteksi wajah…', 'info');
+      await ensureAIModel();
+    }
+    if (!faceModel) {
+      showToast('❌ Model AI gagal dimuat — scan wajah dibatalkan. Muat ulang video & coba lagi.', 'error');
+      return;
+    }
 
     const originalTime = videoElement.currentTime;
     const isPlaying = !videoElement.paused;
     if (isPlaying) videoElement.pause();
+
+    // Guard: video belum punya frame (belum siap di-seek) → jangan hang
+    if (!videoElement.videoWidth || !videoElement.videoHeight) {
+      showToast('❌ Video belum siap dipindai. Muat ulang video & coba lagi.', 'error');
+      return;
+    }
 
     const oldCursor = document.body.style.cursor;
     document.body.style.cursor = 'wait';
@@ -1281,12 +1466,20 @@
     for (let t = startSec; t <= endSec; t += step) {
       videoElement.currentTime = t;
       
+      // Tunggu frame siap, tapi dengan timeout — kalau seek ke posisi yang sama
+      // (event 'seeked' tidak fire), jangan sampai scan hang selamanya.
       await new Promise((resolve) => {
-        const onSeeked = () => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
           videoElement.removeEventListener('seeked', onSeeked);
           resolve();
         };
+        const onSeeked = () => finish();
         videoElement.addEventListener('seeked', onSeeked);
+        const timer = setTimeout(finish, 500);
       });
 
       try {
@@ -1311,13 +1504,31 @@
           const cx = (x1 + w / 2) / videoElement.videoWidth;
           const cy = (y1 + h / 2) / videoElement.videoHeight;
 
-          const beta = 0.06;
-          const deadband = 0.04; // 4% deadband threshold to prevent jitter/micro-movements
-          if (Math.abs(cx - lastCx) > deadband) {
-            lastCx = lastCx + beta * (cx - lastCx);
+          // Adaptive smoothing + velocity prediction (sama seperti live tracking)
+          const distS = Math.hypot(cx - lastCx, cy - lastCy);
+          let betaS;
+          if (distS > 0.15) betaS = 0.50;       // karakter jauh → kejar cepat
+          else if (distS > 0.07) betaS = 0.32;  // sedang → responsif
+          else betaS = 0.16;                    // dekat → stabil
+
+          const deadbandS = 0.015; // 1.5% — mulai bergerak cepat
+
+          // Velocity prediction: kurangi lag path ekspor saat karakter gerak cepat
+          if (lastFaceCx !== null) {
+            velCx = 0.6 * velCx + 0.4 * (cx - lastFaceCx);
+            velCy = 0.6 * velCy + 0.4 * (cy - lastFaceCy);
           }
-          if (Math.abs(cy - lastCy) > deadband) {
-            lastCy = lastCy + beta * (cy - lastCy);
+          lastFaceCx = cx;
+          lastFaceCy = cy;
+
+          const predCxS = cx + velCx * 1.5;
+          const predCyS = cy + velCy * 1.5;
+
+          if (Math.abs(predCxS - lastCx) > deadbandS) {
+            lastCx = lastCx + betaS * (predCxS - lastCx);
+          }
+          if (Math.abs(predCyS - lastCy) > deadbandS) {
+            lastCy = lastCy + betaS * (predCyS - lastCy);
           }
 
           let landmarks = null;
@@ -1582,6 +1793,10 @@
 
   // Video playback events
   videoElement.addEventListener('play', () => {
+    // Lazy-init AI: tf.js + BlazeFace baru dimuat saat video benar-benar diputar
+    if (!modelReady && typeof loadAIModel === 'function') {
+      loadAIModel();
+    }
     trackLoop();
   });
   videoElement.addEventListener('pause', () => {
@@ -1707,6 +1922,10 @@
     videoElement.style.display = 'block';
     videoElement.load();
     
+    // Panaskan model AI di background begitu video tersedia —
+    // supaya pas ekspor butuh scan wajah, model SUDAH siap.
+    loadAIModel();
+
     videoElement.onloadedmetadata = () => {
       trackerCanvas.width = videoElement.clientWidth;
       trackerCanvas.height = videoElement.clientHeight;
@@ -1785,6 +2004,10 @@
       if (highlights && highlights.length > 0) {
         renderSuggestedHighlightsList(highlights);
         highlightsContainer.classList.remove('hidden');
+        const railCount = document.getElementById('railCount');
+        if (railCount) railCount.textContent = highlights.length;
+        const railEmpty = document.getElementById('railEmpty');
+        if (railEmpty) railEmpty.classList.add('hidden');
 
         // Pilih highlight dengan score tertinggi secara default
         const topHighlight = [...highlights].sort((a, b) => (b.viralScore ?? 0) - (a.viralScore ?? 0))[0] || highlights[0];
@@ -1948,41 +2171,70 @@
       const borderColor = gradeColors[grade] || '#6b7280';
 
       const item = document.createElement('div');
-      item.style.cssText = `
-        display: flex;
-        align-items: center;
-        padding: 10px 12px;
-        background: var(--bg-raised);
-        border: 1px solid ${borderColor}33;
-        border-left: 3px solid ${borderColor};
-        border-radius: 8px;
-        font-size: 13px;
-        transition: border-color 0.2s, background 0.2s, transform 0.1s;
-        gap: 10px;
-        cursor: default;
-      `;
-      item.addEventListener('mouseenter', () => { item.style.transform = 'translateX(2px)'; });
-      item.addEventListener('mouseleave', () => { item.style.transform = ''; });
+      item.className = 'hl-card';
+      item.style.borderLeft = `4px solid ${borderColor}`;
+      item.style.borderColor = `${borderColor}40`;
 
       // ===== Rank badge =====
       const rankBadge = document.createElement('span');
-      rankBadge.style.cssText = `
-        font-size: 10px; font-weight: 700; color: var(--muted);
-        min-width: 22px; text-align: center; flex-shrink: 0;
-      `;
-      rankBadge.textContent = `#${idx + 1}`;
+      rankBadge.className = 'hl-rank';
+      rankBadge.innerHTML = `<strong>#${idx + 1}</strong> KLIP`;
 
       // ===== Viral grade badge =====
       const gradeBadge = document.createElement('span');
-      gradeBadge.style.cssText = `
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0;
-        font-size: 13px; font-weight: 800; letter-spacing: 0;
-        background: ${borderColor}22; color: ${borderColor};
-        border: 1px solid ${borderColor}55;
-      `;
-      gradeBadge.textContent = grade;
+      gradeBadge.className = 'hl-grade-badge';
+      gradeBadge.style.background = `${borderColor}22`;
+      gradeBadge.style.color = borderColor;
+      gradeBadge.style.border = `1px solid ${borderColor}55`;
+      gradeBadge.innerHTML = `${vEmoji} ${grade}`;
       gradeBadge.title = `Grade ${grade}: ${vLabel} (${vs}/100)`;
+
+      // ===== Checkbox for batch selection =====
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.style.cssText = `
+        width: 17px; height: 17px; flex-shrink: 0;
+        accent-color: ${borderColor}; cursor: pointer;
+      `;
+      checkbox.title = `Pilih untuk ekspor batch`;
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          selectedHighlights.add(idx);
+          item.style.background = `${borderColor}10`;
+        } else {
+          selectedHighlights.delete(idx);
+          item.style.background = '';
+        }
+        updateExportBar();
+      });
+
+      // ===== Header row =====
+      const headRow = document.createElement('div');
+      headRow.className = 'hl-card-head';
+      headRow.appendChild(checkbox);
+      headRow.appendChild(rankBadge);
+      headRow.appendChild(gradeBadge);
+
+      // ===== Vizard-style thumbnail placeholder =====
+      const thumb = document.createElement('div');
+      thumb.className = 'hl-thumb';
+      thumb.style.setProperty('--hl-glow-1', `${borderColor}59`);
+      thumb.style.setProperty('--hl-glow-2', `${borderColor}14`);
+      const thumbEmoji = document.createElement('span');
+      thumbEmoji.className = 'hl-thumb-emoji';
+      thumbEmoji.textContent = vEmoji;
+      thumb.appendChild(thumbEmoji);
+      const durChip = document.createElement('span');
+      durChip.className = 'hl-thumb-dur';
+      durChip.textContent = durLabel;
+      thumb.appendChild(durChip);
+      const thumbPlay = document.createElement('button');
+      thumbPlay.type = 'button';
+      thumbPlay.className = 'hl-thumb-play';
+      thumbPlay.innerHTML = '▶';
+      thumbPlay.title = 'Tonton segmen ini di player';
+      thumbPlay.addEventListener('click', () => playHighlightSegment(hl, idx, itemEls));
+      thumb.appendChild(thumbPlay);
 
       // ===== Info block =====
       const info = document.createElement('div');
@@ -1991,23 +2243,19 @@
       // ===== Vizard-style Title Banner =====
       if (hl.autoTitle) {
         const titleEl = document.createElement('div');
-        titleEl.style.cssText = 'font-weight: 700; font-size: 13px; color: var(--text); margin-bottom: 4px; line-height: 1.3;';
+        titleEl.className = 'hl-title';
         titleEl.textContent = hl.autoTitle;
         info.appendChild(titleEl);
       }
 
       const topLine = document.createElement('div');
-      topLine.style.cssText = 'display: flex; align-items: center; gap: 4px; flex-wrap: wrap;';
+      topLine.className = 'hl-time-row';
 
       const startInp = document.createElement('input');
       startInp.type = 'text';
       startInp.value = secondsToTime(hl.start);
       startInp.title = 'Ubah waktu mulai';
-      startInp.style.cssText = `
-        width: 66px; text-align: center; font-family: var(--font-mono);
-        background: var(--bg-alt); border: 1px solid var(--border);
-        color: var(--text); border-radius: 4px; padding: 2px 4px; font-size: 11px;
-      `;
+      startInp.className = 'hl-time-inp';
 
       const separator = document.createElement('span');
       separator.textContent = '—';
@@ -2017,14 +2265,10 @@
       endInp.type = 'text';
       endInp.value = secondsToTime(hl.end);
       endInp.title = 'Ubah waktu selesai';
-      endInp.style.cssText = `
-        width: 66px; text-align: center; font-family: var(--font-mono);
-        background: var(--bg-alt); border: 1px solid var(--border);
-        color: var(--text); border-radius: 4px; padding: 2px 4px; font-size: 11px;
-      `;
+      endInp.className = 'hl-time-inp';
 
       const durationLabel = document.createElement('span');
-      durationLabel.style.cssText = 'font-size: 10px; color: var(--muted); margin-left: 4px; font-weight: 500;';
+      durationLabel.className = 'hl-dur';
       durationLabel.textContent = durLabel;
 
       topLine.appendChild(startInp);
@@ -2059,23 +2303,21 @@
 
       // Viral score bar
       const barWrap = document.createElement('div');
-      barWrap.style.cssText = `
-        flex: 1; max-width: 80px; height: 4px; background: var(--border);
-        border-radius: 2px; overflow: hidden;
-      `;
+      barWrap.className = 'hl-scorebar';
       const barFill = document.createElement('div');
-      barFill.style.cssText = `
-        height: 100%; width: ${vs}%; background: ${borderColor};
-        border-radius: 2px; transition: width 0.5s ease;
-      `;
+      barFill.className = 'hl-scorebar-fill';
+      barFill.style.width = `${vs}%`;
+      barFill.style.background = borderColor;
       barWrap.appendChild(barFill);
 
       const viralText = document.createElement('span');
-      viralText.style.cssText = `font-size: 10px; color: ${borderColor}; font-weight: 600;`;
+      viralText.className = 'hl-viral-label';
+      viralText.style.color = borderColor;
       viralText.textContent = `${vEmoji} ${vLabel}`;
 
       const scoreText = document.createElement('span');
-      scoreText.style.cssText = `font-size: 10.5px; color: ${borderColor}; margin-left: auto; font-weight: 800;`;
+      scoreText.className = 'hl-score';
+      scoreText.style.color = borderColor;
       scoreText.textContent = `${(vs / 10).toFixed(1)} VIRALITY`;
 
       bottomLine.appendChild(barWrap);
@@ -2084,15 +2326,12 @@
 
       // ===== Viral Analysis Box (Alasan Kenapa Klip Ini Populer & Point Menarik) =====
       const reasonBox = document.createElement('div');
-      reasonBox.style.cssText = `
-        margin-top: 6px; padding: 6px 9px;
-        background: ${borderColor}12; border-left: 2px solid ${borderColor};
-        border-radius: 6px; font-size: 11px; color: var(--text);
-        line-height: 1.4;
-      `;
+      reasonBox.className = 'hl-reason';
+      reasonBox.style.borderLeftColor = borderColor;
       const reasonHeader = document.createElement('div');
-      reasonHeader.style.cssText = 'font-weight: 700; color: ' + borderColor + '; margin-bottom: 2px; font-size: 10.5px;';
-      reasonHeader.innerHTML = `💡 <strong>Analisis AI (Grade ${grade}):</strong>`;
+      reasonHeader.className = 'hl-reason-head';
+      reasonHeader.style.color = borderColor;
+      reasonHeader.innerHTML = `💡 <strong>Viral reason (Grade ${grade}):</strong>`;
       reasonBox.appendChild(reasonHeader);
 
       const reasonText = document.createElement('div');
@@ -2101,7 +2340,7 @@
 
       if (Array.isArray(hl.highlightPoints) && hl.highlightPoints.length > 0) {
         const pointsList = document.createElement('ul');
-        pointsList.style.cssText = 'margin: 4px 0 0; padding-left: 14px; font-size: 10px; color: var(--muted);';
+        pointsList.className = 'hl-reason-list';
         hl.highlightPoints.forEach(pt => {
           const li = document.createElement('li');
           li.textContent = pt;
@@ -2186,39 +2425,23 @@
         const reasonMsg = hl.analysisReason ? `\n💡 Analisis: ${hl.analysisReason}` : '';
         showToast(`${vEmoji} Momen #${idx + 1} (${vLabel}) dipilih. Metadata konten disiapkan.${reasonMsg}`);
         itemEls.forEach((el, i) => {
-          el.style.borderLeft = i === idx ? `3px solid ${borderColor}` : `3px solid ${gradeColors[highlights[i]?.viralGrade] || '#6b7280'}`;
-          el.style.background = i === idx ? `${borderColor}0d` : 'var(--bg-raised)';
+          el.style.borderLeft = i === idx ? `4px solid ${borderColor}` : `4px solid ${gradeColors[highlights[i]?.viralGrade] || '#6b7280'}`;
+          el.style.background = i === idx ? `${borderColor}0d` : '';
         });
       });
 
-      // ===== Checkbox for batch selection =====
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.style.cssText = `
-        width: 16px; height: 16px; flex-shrink: 0;
-        accent-color: ${borderColor}; cursor: pointer;
-        margin-right: 2px;
-      `;
-      checkbox.title = `Pilih untuk ekspor batch`;
-      checkbox.addEventListener('change', () => {
-        if (checkbox.checked) {
-          selectedHighlights.add(idx);
-          item.style.background = `${borderColor}10`;
-        } else {
-          selectedHighlights.delete(idx);
-          item.style.background = 'var(--bg-raised)';
-        }
-        updateExportBar();
-      });
+      // ===== Actions row =====
+      useBtn.classList.add('btn-use');
+      const actions = document.createElement('div');
+      actions.className = 'hl-actions';
+      actions.appendChild(useBtn);
+      actions.appendChild(playBtn);
+      actions.appendChild(preview916Btn);
 
-      item.appendChild(checkbox);
-      item.appendChild(rankBadge);
-      item.appendChild(gradeBadge);
-
+      item.appendChild(headRow);
+      item.appendChild(thumb);
       item.appendChild(info);
-      item.appendChild(playBtn);
-      item.appendChild(preview916Btn);
-      item.appendChild(useBtn);
+      item.appendChild(actions);
       highlightsList.appendChild(item);
       itemEls.push(item);
     });
@@ -2259,6 +2482,7 @@
 
     exportSelectedBtn.disabled = true;
     exportSelectedBtn.innerHTML = `⏳ Mengekspor 0/${indices.length}…`;
+    startActiveProgressUI(`📦 Menyiapkan ekspor ${indices.length} klip terpilih…`, 4);
 
     const results = [];
     for (let i = 0; i < indices.length; i++) {
@@ -2269,6 +2493,7 @@
       const end   = secondsToTime(hl.end);
 
       exportSelectedBtn.innerHTML = `⏳ Mengekspor ${i + 1}/${indices.length}…`;
+      updateActiveProgressUI(`✂️ Klip ${i + 1}/${indices.length}: ${start} — ${end}`, Math.round((i / indices.length) * 100));
       showToast(`Memproses Clip ${i + 1}/${indices.length}: ${start} — ${end}`);
 
       if (aspect.startsWith('9:16') || aspect === '1:1') {
@@ -2314,6 +2539,8 @@
               if (status.progress !== undefined) {
                 exportSelectedBtn.innerHTML = `⏳ Mengekspor ${i + 1}/${indices.length} (${status.progress}%)…`;
               }
+              // Drive progress bar batch (0-100% keseluruhan)
+              updateBatchProgressUI(i, indices.length, status);
               if (status.status === 'done') {
                 if (sseRef.source) sseRef.source.close();
                 results.push({ jobId: data.jobId, outputFile: status.outputFile, downloadUrl: `/api/download/${data.jobId}` });
@@ -2327,6 +2554,7 @@
           );
         });
       } catch (err) {
+        updateActiveProgressUI(`❌ Klip ${i + 1}/${indices.length} gagal: ${err.message}`, Math.round(((i + 1) / indices.length) * 100));
         showToast(`Clip ${i + 1} gagal: ${err.message}`, 'error');
       }
     }
@@ -2336,7 +2564,10 @@
     exportSelectedBtn.innerHTML = `✅ Selesai (${results.length}/${indices.length})`;
 
     if (results.length > 0) {
+      updateActiveProgressUI(`✅ Selesai — ${results.length} klip siap diunduh. Klik ⬇ Download di bawah.`, 100);
       renderBatchResultPanel(results);
+    } else {
+      updateActiveProgressUI('❌ Tidak ada klip yang berhasil diekspor.', 100);
     }
   }
 
@@ -2655,6 +2886,26 @@
     if (progressBar && percent !== undefined) progressBar.style.width = `${percent}%`;
     if (progressPercent && percent !== undefined) progressPercent.textContent = `${percent}%`;
     if (progressStage && stageText) progressStage.textContent = stageText;
+  }
+
+  // ===== Progress UI khusus Batch Export (klip terpilih / antrian) =====
+  // Peta progress per-klip (SSE 0-100%) → progress keseluruhan batch (0-100%)
+  function updateBatchProgressUI(clipIndex, clipTotal, status) {
+    const rawPct = Math.round(status.progress || 0);
+    const clipStart = (clipIndex / clipTotal) * 100;
+    const clipEnd = ((clipIndex + 1) / clipTotal) * 100;
+    const overall = Math.round(clipStart + (clipEnd - clipStart) * (rawPct / 100));
+
+    let stage;
+    if (status.status === 'done') {
+      stage = `✅ Klip ${clipIndex + 1}/${clipTotal} selesai`;
+    } else if (status.status === 'error') {
+      stage = `❌ Klip ${clipIndex + 1}/${clipTotal} gagal`;
+    } else {
+      stage = `🎬 Klip ${clipIndex + 1}/${clipTotal}: ${status.stage || 'Memproses…'} (${rawPct}%)`;
+    }
+    updateActiveProgressUI(stage, overall);
+    return overall;
   }
 
   // ===== STEP 3: Listen Progress via SSE =====

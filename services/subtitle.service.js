@@ -17,7 +17,7 @@ const { ERROR_CODES } = require('../config/constants');
  * Generate subtitle ASS dari audio/video input secara asinkron via Python Whisper.
  * @param {object} params
  * @param {string} params.inputPath - Path file video atau audio
- * @param {string} [params.style='yellow-viral'] - 'yellow-viral' | 'neon-green' | 'cyan-blue' | 'clean-white'
+ * @param {string} [params.style='yellow-viral'] - 'yellow-viral' | 'vizard-classic' | 'vizard-pop' | 'vizard-neon' | 'vizard-gradient' | 'vizard-outline'
  * @param {string} [params.language='auto'] - 'auto' | 'id' | 'en'
  * @param {string} [params.fontFamily='auto'] - Override jenis font ('auto' = dari template)
  * @param {number} [params.startSeconds=0]

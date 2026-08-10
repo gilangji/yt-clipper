@@ -5,14 +5,26 @@ const logger = require('../utils/logger');
 
 /**
  * Panggil Google Gemini API dengan urutan hirarki model Skripsita Engine:
- *  1. gemini-2.5-flash-lite (Primary Engine — 89.8% traffic, paling hemat kuota)
- *  2. gemini-2.5-flash      (Pro/Heavy Engine — 9.6% traffic)
- *  3. gemini-2.0-flash      (Fallback Legacy Engine — 0.3%)
- *  4. gemini-3.5-flash      (High-Reasoning Engine — 0.2%)
+ *  1. gemini-2.5-flash      (Primary Engine — cepat, kuota stabil)
+ *  2. gemini-3.5-flash      (High-Reasoning Engine — fallback)
+ *  3. gemini-3.6-flash      (Latest Engine — fallback akhir)
  *
- * Menggunakan Auto-Rotation & Failover key pool.
- * Jika key 1 limit (HTTP 429/403), otomatis beralih ke key 2, key 3, dst.
+ * CATATAN PERFORMANCE (2026-08-10):
+ * - gemini-2.5-flash-lite REMOVED: NOT_FOUND "no longer available to new users"
+ *   → tiap key hang 12s timeout sebelum lanjut, bikin analisis highlight super lambat.
+ * - gemini-2.0-flash REMOVED: RESOURCE_EXHAUSTED (kuota habis).
+ * Model mati di-skip otomatis setelah satu kegagalan 4xx per sesi (deadModels cache).
  */
+const MODEL_HIERARCHY = [
+  'gemini-2.5-flash',
+  'gemini-3.5-flash',
+  'gemini-3.6-flash'
+];
+
+// Model yang sudah terbukti gagal (NOT_FOUND / RESOURCE_EXHAUSTED) → skip langsung
+const deadModels = new Set();
+const FAIL_STATUS_TO_SKIP = new Set([400, 404, 403, 429]);
+
 async function callGeminiAPI(prompt, userApiKey = null, maxTokens = 256) {
   let keyPool = [];
   if (userApiKey && userApiKey.trim()) {
@@ -32,18 +44,14 @@ async function callGeminiAPI(prompt, userApiKey = null, maxTokens = 256) {
     return null; // Graceful fallback jika tanpa API key
   }
 
-  // Hirarki Model Skripsita Engine (Prioritas Hemat Kuota & Kecepatan)
-  const MODEL_HIERARCHY = [
-    'gemini-2.5-flash-lite',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-3.5-flash'
-  ];
+  // Ambil hanya model yang belum terbukti mati (hemat waktu timeout)
+  const liveModels = MODEL_HIERARCHY.filter(m => !deadModels.has(m));
+  if (liveModels.length === 0) return null;
 
   let lastError = null;
 
   for (const key of keyPool) {
-    for (const modelName of MODEL_HIERARCHY) {
+    for (const modelName of liveModels) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
       try {
         const response = await axios.post(endpoint, {
@@ -63,6 +71,13 @@ async function callGeminiAPI(prompt, userApiKey = null, maxTokens = 256) {
         lastError = err;
         const status = err.response?.status;
         logger.warn(`Gemini API call gagal [Model: ${modelName}, Key: ...${key.slice(-6)}]: HTTP ${status || 'ERR'} - ${err.message}`);
+
+        // Model mati (NOT_FOUND/RESOURCE_EXHAUSTED/etc) → tandai & skip selamanya di sesi ini
+        if (status && FAIL_STATUS_TO_SKIP.has(status)) {
+          deadModels.add(modelName);
+          logger.warn(`Model ${modelName} ditandai DEAD utk sesi ini (HTTP ${status}) — akan di-skip.`);
+          break; // pindah model berikutnya
+        }
 
         if (status === 429 || status === 403) {
           geminiManager.markKeyExhausted(key, `HTTP ${status} on ${modelName}`);
