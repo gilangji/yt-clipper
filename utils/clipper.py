@@ -126,7 +126,23 @@ def get_dual_crop_centers(t, crops, W, H):
     """
     cx_main, cy_main, landmarks = get_crop_center(t, crops, W, H)
 
-    # Posisi default simetris jika tidak ada 2 deteksi terpisah
+    # 1. Cek apakah ada sampel di dekat waktu t yang memiliki 2 koordinat wajah (cx, cy) dan (cx2, cy2)
+    if crops:
+        crops_valid = [c for c in crops if c.get('cx') is not None]
+        if crops_valid:
+            closest = min(crops_valid, key=lambda c: abs(c.get('time', 0) - t))
+            if abs(closest.get('time', 0) - t) < 0.5 and 'cx2' in closest and closest['cx2'] is not None:
+                c1_x = int(closest['cx'] * W)
+                c1_y = int(closest.get('cy', 0.5) * H)
+                c2_x = int(closest['cx2'] * W)
+                c2_y = int(closest.get('cy2', 0.5) * H)
+                # Tokoh Kiri → Frame Atas, Tokoh Kanan → Frame Bawah
+                if c1_x <= c2_x:
+                    return (c1_x, c1_y), (c2_x, c2_y), landmarks
+                else:
+                    return (c2_x, c2_y), (c1_x, c1_y), landmarks
+
+    # 2. Posisi default simetris jika tidak ada 2 deteksi terpisah
     cx_left = int(W * 0.28)
     cy_left = cy_main
     cx_right = int(W * 0.72)
@@ -139,7 +155,7 @@ def get_dual_crop_centers(t, crops, W, H):
         cx_right = cx_main
         cy_right = cy_main
 
-    # Cari di crops apakah ada sampel wajah di sisi berlawanan dekat waktu t
+    # 3. Cari sampel wajah di sisi berlawanan dekat waktu t
     if crops:
         crops_valid = [c for c in crops if c.get('cx') is not None]
         opposite_crops = [c for c in crops_valid if (cx_main < W // 2 and c['cx'] * W >= W // 2) or (cx_main >= W // 2 and c['cx'] * W < W // 2)]

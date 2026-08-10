@@ -540,6 +540,8 @@
   const customRatioH = document.getElementById('customRatioH');
   const applyCustomRatioBtn = document.getElementById('applyCustomRatioBtn');
 
+  const dualSplitToggle = document.getElementById('dualSplitToggle');
+
   if (aspectRatioSelect) {
     aspectRatioSelect.addEventListener('change', () => {
       if (customRatioBox) {
@@ -549,6 +551,24 @@
           customRatioBox.classList.add('hidden');
         }
       }
+      if (dualSplitToggle) {
+        dualSplitToggle.checked = (aspectRatioSelect.value === '9:16-dualsplit');
+      }
+      updateCropPreviewPosition();
+    });
+  }
+
+  if (dualSplitToggle && aspectRatioSelect) {
+    dualSplitToggle.addEventListener('change', () => {
+      if (dualSplitToggle.checked) {
+        aspectRatioSelect.value = '9:16-dualsplit';
+        showToast('👥 Mode Bagi Dua Layar (Dual-Split Podcast 9:16) diaktifkan!', 'info');
+      } else {
+        if (aspectRatioSelect.value === '9:16-dualsplit') {
+          aspectRatioSelect.value = '9:16';
+        }
+      }
+      updateCropPreviewPosition();
     });
   }
 
@@ -1379,9 +1399,13 @@
     trackingInterval = requestAnimationFrame(trackLoop);
   }
 
-  function addCropPoint(t, cx, cy, landmarks) {
+  function addCropPoint(t, cx, cy, landmarks, cx2 = null, cy2 = null) {
     const idx = cropPoints.findIndex((pt) => Math.abs(pt.time - t) < 0.1);
     const newPt = { time: t, cx, cy, landmarks };
+    if (cx2 !== null && cy2 !== null) {
+      newPt.cx2 = cx2;
+      newPt.cy2 = cy2;
+    }
     if (idx !== -1) {
       // Jangan timpa manual override jika ada
       if (!cropPoints[idx].manual) {
@@ -1541,7 +1565,28 @@
             };
           }
 
-          addCropPoint(t, lastCx, lastCy, landmarks);
+          let cx2Val = null;
+          let cy2Val = null;
+
+          if (predictions.length >= 2) {
+            // Sort wajah dari kiri ke kanan (Speaker 1 = Left, Speaker 2 = Right)
+            const sortedByX = [...predictions].sort((a, b) => a.topLeft[0] - b.topLeft[0]);
+            const p1 = sortedByX[0];
+            const p2 = sortedByX[sortedByX.length - 1];
+
+            const c1x = (p1.topLeft[0] + (p1.bottomRight[0] - p1.topLeft[0]) / 2) / videoElement.videoWidth;
+            const c1y = (p1.topLeft[1] + (p1.bottomRight[1] - p1.topLeft[1]) / 2) / videoElement.videoHeight;
+            const c2x = (p2.topLeft[0] + (p2.bottomRight[0] - p2.topLeft[0]) / 2) / videoElement.videoWidth;
+            const c2y = (p2.topLeft[1] + (p2.bottomRight[1] - p2.topLeft[1]) / 2) / videoElement.videoHeight;
+
+            // Jika ada 2 tokoh terpisah secara signifikan (>10% lebar layar)
+            if (Math.abs(c2x - c1x) > 0.10) {
+              cx2Val = c2x;
+              cy2Val = c2y;
+            }
+          }
+
+          addCropPoint(t, lastCx, lastCy, landmarks, cx2Val, cy2Val);
           drawScanIndicator(lastCx, lastCy);
         }
       } catch (err) {
