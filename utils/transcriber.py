@@ -471,8 +471,8 @@ STYLES = {
         'name': 'ViralYellowKaraoke',
         'font': 'Montserrat',
         'fontsize': 26,
-        'primary_color': '&H00FFFFFF',      # Teks Putih Dasar
-        'secondary_color': '&H0000FFFF',    # Highlight Kuning Aktif (\kf)
+        'primary_color': '&H0000FFFF',      # KUNING — warna kata SETELAH di-highlight (spoken)
+        'secondary_color': '&H00FFFFFF',    # PUTIH — warna dasar kalimat SEBELUM di-highlight
         'outline_color': '&H00000000',      # Border Hitam Pekat 3.5px
         'back_color': '&H80000000',         # Bayangan Transparan
         'bold': 1,
@@ -585,8 +585,8 @@ STYLES = {
         'name': 'QuickBrownKaraoke',
         'font': 'Montserrat',
         'fontsize': 26,
-        'primary_color': '&H00FFFFFF',      # putih — seluruh frasa
-        'secondary_color': '&H0000D4FF',   # kuning #FFD400 — kata yang diucapkan
+        'primary_color': '&H0000D4FF',      # KUNING #FFD400 — kata setelah di-highlight (spoken)
+        'secondary_color': '&H00FFFFFF',    # PUTIH — dasar frasa sebelum di-highlight
         'outline_color': '&H00000000',      # border hitam di teks
         'back_color': '&H64000000',
         'bold': 1,
@@ -600,8 +600,8 @@ STYLES = {
         'name': 'QuickBrownInv',
         'font': 'Montserrat',
         'fontsize': 26,
-        'primary_color': '&H0000D4FF',   # KUNING #FFD400 — dasar frasa
-        'secondary_color': '&H00FFFFFF', # PUTIH — sweep karaoke yang berjalan
+        'primary_color': '&H0000D4FF',   # KUNING #FFD400 — kata setelah di-highlight (spoken)
+        'secondary_color': '&H00FFFFFF', # PUTIH — dasar frasa sebelum di-highlight
         'outline_color': '&H00000000',      # border hitam tetap
         'back_color': '&H64000000',
         'bold': 1,
@@ -609,7 +609,7 @@ STYLES = {
         'shadow': 1.0,
         'alignment': 2,
         'margin_v': 75,
-        'caption_mode': 'karaoke'           # kebalikan: kuning dasar, putih berjalan
+        'caption_mode': 'karaoke'           # kuning = spoken, putih = base
     },
     # ===== AUTO-CLIPPER CUSTOM (Karaoke / Standard + Typografi penuh) =====
     # Rendering diarahkan ke engine custom (words_to_karaoke_ass /
@@ -745,8 +745,12 @@ def calculate_ass_styles(width, height, custom_margin_v=None, subtitle_config=No
     return font_size, outline, shadow, margin_h, margin_v
 
 
-def build_custom_ass_header(width, height, cfg, primary_color="&H00FFFFFF"):
-    """ASS header untuk mode custom (auto-clipper)."""
+def build_custom_ass_header(width, height, cfg, primary_color="&H00FFFFFF", secondary_color="&H00FFFFFF"):
+    """ASS header untuk mode custom (auto-clipper).
+    SecondaryColour WAJIB ada agar \kf karaoke sweep berfungsi:
+      - SecondaryColour = warna SEBELUM di-highlight (base/unhighlighted)
+      - PrimaryColour   = warna SETELAH di-highlight (spoken/sweep target)
+    """
     font_size, outline, shadow, margin_h, margin_v = calculate_ass_styles(width, height, subtitle_config=cfg)
     outline = max(2, outline)
     shadow = max(2, shadow)
@@ -760,10 +764,10 @@ def build_custom_ass_header(width, height, cfg, primary_color="&H00FFFFFF"):
         f"PlayResX: {width}\n"
         f"PlayResY: {height}\n\n"
         "[V4+ Styles]\n"
-        "Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, "
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, "
         "Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Default,{font_name},{font_size},{primary_color},&H00000000,&H80000000,"
+        f"Style: Default,{font_name},{font_size},{primary_color},{secondary_color},&H00000000,&H80000000,"
         f"{bold_val},{italic_val},0,0,100,100,0,0,1,{outline},{shadow},2,{margin_h},{margin_h},{margin_v},1\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
@@ -771,12 +775,17 @@ def build_custom_ass_header(width, height, cfg, primary_color="&H00FFFFFF"):
 
 
 def words_to_karaoke_ass(words, width, height, clip_start, clip_end, subtitle_config=None):
-    """Single-word pop ASS: setiap kata menyala dengan highlight color (mode karaoke)."""
+    """Phrase-level karaoke ASS: frasa utuh + \kf sweep per kata (putih dasar, kuning highlight).
+    Menggunakan SecondaryColour=PUTIH (base), PrimaryColour=KUNING (sweep target).
+    """
     cfg = normalize_subtitle_config(subtitle_config, legacy_style="karaoke")
-    ass_primary_color = hex_to_ass_style_color(cfg.get("highlight_color", "#FFE600"))
-    header = build_custom_ass_header(width, height, cfg, primary_color=ass_primary_color)
+    highlight_hex = cfg.get("highlight_color", "#FFE600")
+    ass_primary_color = hex_to_ass_style_color(highlight_hex)      # KUNING — kata setelah di-highlight
+    ass_secondary_color = "&H00FFFFFF"                              # PUTIH — kata sebelum di-highlight
+    header = build_custom_ass_header(width, height, cfg, primary_color=ass_primary_color, secondary_color=ass_secondary_color)
     is_uppercase = cfg.get("uppercase", True)
 
+    # Filter kata dalam rentang klip
     clip_words = []
     for w in words:
         w_start = float(w.get("start", 0))
@@ -793,37 +802,53 @@ def words_to_karaoke_ass(words, width, height, clip_start, clip_end, subtitle_co
         return header
 
     events = []
-    num_words = len(clip_words)
     clip_total = clip_end - clip_start
 
-    for i in range(num_words):
-        curr_word = clip_words[i]
-        w_start = curr_word["start"]
-        raw_end = curr_word["end"]
+    # Gunakan segment penuh (1 Dialogue = 1 segmen Whisper) untuk kalimat utuh
+    # Bagi segmen besar (>12 kata) jadi 2 baris agar muat di layar 9:16
+    MAX_WORDS_PER_LINE = 12
 
-        if i < num_words - 1:
-            next_start = clip_words[i + 1]["start"]
-            gap = next_start - raw_end
-            if 0 <= gap < 0.2:
-                w_end = next_start
+    i = 0
+    while i < len(clip_words):
+        # Ambil segmen (group kata berdekatan, max MAX_WORDS_PER_LINE)
+        j = i
+        while j < len(clip_words) and (j - i) < MAX_WORDS_PER_LINE:
+            # Cek gap besar antar kata (>1.5 detik = akhir kalimat)
+            if j > i:
+                prev_end = clip_words[j - 1]["end"]
+                curr_start = clip_words[j]["start"]
+                if curr_start - prev_end > 1.5:
+                    break
+            j += 1
+
+        chunk = clip_words[i:j]
+        phrase_start = max(0.0, chunk[0]["start"])
+        phrase_end = min(clip_total, chunk[-1]["end"] + 0.3)  # padding kecil
+
+        # Bangun teks karaoke dengan \kf (smooth sweep)
+        parts = []
+        for k, w in enumerate(chunk):
+            wtext = w["word"].strip()
+            if not wtext:
+                continue
+            wtext = wtext.upper() if is_uppercase else wtext
+
+            # Durasi \kf dalam centiseconds: hingga mulai kata berikutnya (atau akhir kata ini)
+            if k < len(chunk) - 1:
+                dur_cs = max(5, int(round((chunk[k + 1]["start"] - w["start"]) * 100)))
             else:
-                w_end = raw_end
-            w_end = min(w_end, next_start)
-        else:
-            w_end = min(clip_total, raw_end + 0.35)
+                dur_cs = max(5, int(round((w["end"] - w["start"]) * 100)))
+                # Jangan melebihi batas frasa
+                dur_cs = min(dur_cs, int(round((phrase_end - w["start"]) * 100)))
 
-        if i < num_words - 1:
-            w_end = min(max(w_end, w_start + 0.08), clip_words[i + 1]["start"])
-        else:
-            w_end = max(w_end, w_start + 0.08)
+            parts.append(f"{{\\kf{dur_cs}}}{wtext}")
 
-        if w_end <= w_start:
-            continue
+        if parts:
+            line_text = " ".join(parts)
+            line = f"Dialogue: 0,{format_ass_time(phrase_start)},{format_ass_time(phrase_end)},Default,,0,0,0,,{line_text}"
+            events.append(line)
 
-        text = curr_word["word"].upper() if is_uppercase else curr_word["word"]
-        events.append(
-            f"Dialogue: 0,{format_ass_time(w_start)},{format_ass_time(w_end)},Default,,0,0,0,,{text}"
-        )
+        i = j
 
     return header + "\n".join(events) + ("\n" if events else "")
 
@@ -831,7 +856,7 @@ def words_to_karaoke_ass(words, width, height, clip_start, clip_end, subtitle_co
 def words_to_standard_ass(words, width, height, clip_start, clip_end, subtitle_config=None):
     """Sentence-level static ASS: kalimat penuh per baris (mode standard)."""
     cfg = normalize_subtitle_config(subtitle_config, legacy_style="standard")
-    header = build_custom_ass_header(width, height, cfg, primary_color="&H00FFFFFF")
+    header = build_custom_ass_header(width, height, cfg, primary_color="&H00FFFFFF", secondary_color="&H00FFFFFF")
     is_uppercase = cfg.get("uppercase", False)
 
     clip_words = []
@@ -1118,8 +1143,10 @@ def transcribe_and_generate_custom_ass(audio_path, output_ass_path, subtitle_con
             words.append({"word": wtext, "start": ws, "end": we})
 
     if not words:
-        header = build_custom_ass_header(play_res_x, play_res_y, cfg,
-                                         primary_color=hex_to_ass_style_color(cfg.get("highlight_color", "#FFE600")))
+        is_karaoke = cfg.get("style") == "karaoke"
+        primary = hex_to_ass_style_color(cfg.get("highlight_color", "#FFE600")) if is_karaoke else "&H00FFFFFF"
+        secondary = "&H00FFFFFF"  # PUTIH base untuk mode standard & karaoke
+        header = build_custom_ass_header(play_res_x, play_res_y, cfg, primary_color=primary, secondary_color=secondary)
         with open(output_ass_path, 'w', encoding='utf-8') as f:
             f.write(header)
         return 0
@@ -1270,36 +1297,61 @@ def transcribe_and_generate_ass(audio_path, output_ass_path, style_name='yellow-
                     ass_lines.append(wline)
             elif caption_mode == 'karaoke':
                 # ===== Mode karaoke (CapCut "The Quick Brown Fox") =====
-                # Chunk size adaptif: font raksasa/monster memakai 2-3 kata agar teks
-                # tampil besar, jelas, dan fokus seperti video Alex Hormozi & MrBeast
-                if font_size_key in ('colossal', 'xxlarge'):
-                    chunk_size = 2
-                elif font_size_key in ('huge', 'xlarge'):
-                    chunk_size = 3
-                elif font_size_key == 'large':
-                    chunk_size = 4
-                else:
-                    chunk_size = 5
+                # Gunakan segmen Whisper penuh (1 Dialogue = 1 segmen) untuk kalimat utuh
+                # \kf = smooth sweep (bukan \k instant fill)
+                # PrimaryColour = kuning (spoken), SecondaryColour = putih (base) — sudah benar di STYLES
+                MAX_WORDS_PER_LINE = 12
 
-                for i in range(0, len(words), chunk_size):
-                    chunk = words[i:i + chunk_size]
-                    chunk_start = max(0.0, chunk[0].start - offset_seconds)
-                    chunk_end = max(chunk_start + 0.4, chunk[-1].end - offset_seconds)
-
-                    parts = []
-                    for w in chunk:
-                        wtext = w.word.strip()
-                        if not wtext:
-                            continue
-                        dur_cs = max(5, int(round((w.end - w.start) * 100)))
-                        wtext_c = apply_text_casing(inject_emojis_to_text(wtext), effective_case)
-                        parts.append(f"{{\\k{dur_cs}}}{wtext_c}")
-                    if not parts:
+                for segment in segments:
+                    words = list(segment.words)
+                    if not words:
+                        # Fallback ke segmen-level
+                        text = apply_text_casing(segment.text, effective_case)
+                        start_t = max(0.0, segment.start - offset_seconds)
+                        end_t = max(start_t + 0.5, segment.end - offset_seconds)
+                        line = f"Dialogue: 0,{format_ass_time(start_t)},{format_ass_time(end_t)},{base_style['name']},,0,0,0,,{text}"
+                        ass_lines.append(line)
                         continue
-                    line_text = " ".join(parts)
-                    line = (f"Dialogue: 0,{format_ass_time(chunk_start)},{format_ass_time(chunk_end)},"
-                            f"{base_style['name']},,0,0,0,,{line_text}")
-                    ass_lines.append(line)
+
+                    # Bagi segmen besar jadi beberapa baris (<= MAX_WORDS_PER_LINE)
+                    i = 0
+                    while i < len(words):
+                        j = i
+                        while j < len(words) and (j - i) < MAX_WORDS_PER_LINE:
+                            if j > i:
+                                prev_end = words[j - 1].end
+                                curr_start = words[j].start
+                                if curr_start - prev_end > 1.5:
+                                    break
+                            j += 1
+
+                        chunk = words[i:j]
+                        chunk_start = max(0.0, chunk[0].start - offset_seconds)
+                        chunk_end = max(chunk_start + 0.4, chunk[-1].end - offset_seconds)
+
+                        parts = []
+                        for k, w in enumerate(chunk):
+                            wtext = w.word.strip()
+                            if not wtext:
+                                continue
+                            wtext_c = apply_text_casing(inject_emojis_to_text(wtext), effective_case)
+
+                            # Durasi \kf: hingga mulai kata berikutnya (smooth sweep)
+                            if k < len(chunk) - 1:
+                                dur_cs = max(5, int(round((chunk[k + 1].start - w.start) * 100)))
+                            else:
+                                dur_cs = max(5, int(round((w.end - w.start) * 100)))
+                                dur_cs = min(dur_cs, int(round((chunk_end - w.start) * 100)))
+
+                            parts.append(f"{{\\kf{dur_cs}}}{wtext_c}")
+
+                        if parts:
+                            line_text = " ".join(parts)
+                            line = (f"Dialogue: 0,{format_ass_time(chunk_start)},{format_ass_time(chunk_end)},"
+                                    f"{base_style['name']},,0,0,0,,{line_text}")
+                            ass_lines.append(line)
+
+                        i = j
             else:
                 # Group words into short punchy phrases (adaptif terhadap ukuran font)
                 if font_size_key in ('colossal', 'xxlarge'):
@@ -1352,7 +1404,8 @@ def render_preview(cfg):
         scfg = normalize_subtitle_config(subtitle_config)
         is_karaoke = scfg.get("style") == "karaoke"
         primary = hex_to_ass_style_color(scfg.get("highlight_color", "#FFE600")) if is_karaoke else "&H00FFFFFF"
-        header = build_custom_ass_header(width, height, scfg, primary_color=primary)
+        secondary = "&H00FFFFFF"  # PUTIH base untuk mode standard & karaoke
+        header = build_custom_ass_header(width, height, scfg, primary_color=primary, secondary_color=secondary)
         is_upper = scfg.get("uppercase", is_karaoke)
 
         lines = []
