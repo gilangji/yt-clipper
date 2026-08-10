@@ -584,9 +584,9 @@ def main():
                 final_frame[0:speaker_h, 0:W_out] = top_part
                 final_frame[speaker_h:H_out, 0:W_out] = bottom_part
                 
-                # Garis pemisah neon 2px di tengah
+                # Garis pemisah putih 2px di tengah
                 div_y = speaker_h
-                final_frame[div_y-1:div_y+1, :] = np.array([168, 233, 47], dtype=np.uint8)
+                final_frame[div_y-1:div_y+1, :] = np.array([255, 255, 255], dtype=np.uint8)
             elif is_split_gameplay:
                 final_frame = np.zeros((H_out, W_out, 3), dtype=np.uint8)
                 speaker_h = H_out // 2
