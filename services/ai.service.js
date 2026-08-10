@@ -127,37 +127,40 @@ Berikan respons HANYA dalam format JSON valid tanpa tanda backtick markdown sepe
 
 /**
  * AI Highlights Enhancement: Hasilkan Judul, Deskripsi, Tag, Analisis Topik & Poin Penting
- * alami berbasis AI untuk SETIAP klip segmen hasil deteksi highlight.
+ * alami berbasis AI untuk SETIAP klip segmen hasil deteksi highlight (Gaya Vizard AI / Opus Clip).
  */
 async function enhanceHighlightsWithAI(highlights, baseVideoTitle = '', apiKey = null) {
   if (!Array.isArray(highlights) || highlights.length === 0) return highlights;
 
-  const prompt = `Kamu adalah pakar Senior Video Content Strategist & Media Analyst.
+  const prompt = `Kamu adalah Senior AI Video Content Strategist ala Vizard AI & Opus Clip.
 Analisis ${highlights.length} segmen klip dari video "${baseVideoTitle}".
 
-Tugasmu adalah membuatkan Analisis Konten yang Natural & Alami (TANPA BAHASA TEMPLATE KAKU ATAU ROBOTIK).
-Jelaskan secara spesifik dan mendalam apa yang dibahas dalam klip tersebut, mengapa poin itu penting, serta berikan 3 poin kunci (key takeaways).
+Tugasmu:
+1. Buatkan Judul Viral (autoTitle) yang mengundang rasa ingin tahu penonton (misal: "Kenapa Otak Susah 'Shutdown' Saat Mau Tidur?", "Ternyata Otak Kita Menghitung Fisika Saat Nyebrang Jalan!").
+2. Buatkan Viral Reason (analysisReason) yang menjelaskan ALASAN SPESIFIK kenapa materi di segmen klip ini sangat berpotensi viral & relatable bagi audiens.
+3. Buatkan 3 Poin Kunci Pembahasan (highlightPoints) yang merangkum poin penting dalam klip ini.
+4. Buatkan 5 Hashtag spesifik (autoTags) & Caption Siap Copas (autoDescription).
 
 Daftar Segmen Klip:
-${highlights.map((h, i) => `Klip ${i + 1}: Detik ${Math.round(h.start)} s.d ${Math.round(h.end)} (Grade: ${h.viralGrade}, Score: ${h.viralScore}/100)`).join('\n')}
+${highlights.map((h, i) => `Klip #${i + 1}: Detik ${Math.round(h.start)} s.d ${Math.round(h.end)} (Grade: ${h.viralGrade}, Score: ${h.viralScore}/100)`).join('\n')}
 
-Berikan respons HANYA dalam format JSON valid array of objects tanpa backtick markdown seperti ini:
+Berikan respons HANYA dalam format JSON valid array of objects tanpa backtick markdown seperti berikut:
 [
   {
     "index": 0,
-    "autoTitle": "Judul Klip Viral Singkat & Menarik (maksimal 8 kata)",
-    "autoTags": "#Shorts #TikTok #TopikKlip #Viral #KontenEdukasi",
+    "autoTitle": "Judul Klip Viral Klik-Worthy (contoh: Kenapa Otak Susah 'Shutdown' Saat Mau Tidur?)",
+    "autoTags": "#Shorts #TikTok #Neuroscience #Kesehatan #Viral",
     "autoDescription": "Caption menarik 2-3 kalimat yang mengundang interaksi...",
-    "analysisReason": "Penjelasan analisis santai & cerdas tentang topik spesifik yang dibahas di klip ini dan mengapa segmen ini berpotensi viral.",
+    "analysisReason": "Penjelasan analogi otak seperti komputer yang sulit dimatikan sangat relevan dengan masalah tidur banyak orang saat ini, memancing rasa ingin tahu penonton.",
     "highlightPoints": [
-      "💡 Poin kunci 1 yang dibahas dalam klip ini",
-      "🔥 Poin kunci 2 tentang wawasan/solusi utama",
-      "🚀 Poin kunci 3 dampak/takeaway untuk penonton"
+      "⚡ Lonjakan vokal & pembahasan analogi komputer di menit awal",
+      "🎯 Penjelasan fenomena hipervigilance dan fungsi sensorik otak",
+      "📈 Potensi retensi & share rate tinggi bagi audiens umum"
     ]
   }
 ]`;
 
-  const candidate = await callGeminiAPI(prompt, apiKey, 1024);
+  const candidate = await callGeminiAPI(prompt, apiKey, 1200);
 
   if (candidate) {
     try {
@@ -176,7 +179,7 @@ Berikan respons HANYA dalam format JSON valid array of objects tanpa backtick ma
             }
           }
         });
-        logger.info(`Berhasil melengkapi ${aiResults.length} klip highlight dengan AI Content Analysis alami dari Gemini!`);
+        logger.info(`Berhasil melengkapi ${aiResults.length} klip highlight dengan Vizard-style AI Content Analysis dari Gemini!`);
       }
     } catch (e) {
       logger.warn('Gagal parse AI metadata per highlight dari Gemini:', e.message);
