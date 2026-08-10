@@ -1,13 +1,34 @@
 #!/usr/bin/env bash
 # ============================================
-# Sync yt-clipper ke Termux (192.168.43.85:8022)
+# Sync yt-clipper ke Termux
 # Usage: bash sync-termux.sh [--restart]
+#
+# ⚠️ KEAMANAN: kredensial TIDAK di-hardcode di file ini (repo public!).
+#    Buat file ~/.termux-sync.env (mode 600) dengan isi:
+#      TERMUX_USER="u0_a1587"
+#      TERMUX_HOST="192.168.43.85"
+#      TERMUX_PORT="8022"
+#      TERMUX_PASS="ganti-password"
+#    Jika file tidak ada, script meminta input interaktif.
 # ============================================
 set -e
-TERMUX_USER="u0_a1587"
-TERMUX_HOST="192.168.43.85"
-TERMUX_PORT="8022"
-TERMUX_PASS="teemo"
+
+# Load kredensial dari file eksternal yang TIDAK di-track git
+CRED_FILE="$HOME/.termux-sync.env"
+if [ -f "$CRED_FILE" ]; then
+  # shellcheck disable=SC1090
+  source "$CRED_FILE"
+else
+  echo "!! $CRED_FILE tidak ditemukan. Masukkan kredensial Termux:"
+  read -rp "  TERMUX_USER [u0_a1587]: " TERMUX_USER
+  TERMUX_USER="${TERMUX_USER:-u0_a1587}"
+  read -rp "  TERMUX_HOST: " TERMUX_HOST
+  read -rp "  TERMUX_PORT [8022]: " TERMUX_PORT
+  TERMUX_PORT="${TERMUX_PORT:-8022}"
+  read -rsp "  TERMUX_PASS: " TERMUX_PASS
+  echo ""
+fi
+
 SRC="/home/teemo/yt-clipper"
 DST="~/yt-clipper"
 TARBALL="/tmp/yt-clipper-src.tar.gz"

@@ -119,6 +119,9 @@ const config = {
 
   server: {
     port: parseInt(process.env.PORT, 10) || 3000,
+    // HOST: 0.0.0.0 (default, agar bisa diakses dari LAN/HP) — set 127.0.0.1
+    // jika hanya ingin diakses dari mesin yang sama (lebih aman).
+    host: process.env.HOST || '0.0.0.0',
     env: process.env.NODE_ENV || 'development',
     baseUrl: process.env.BASE_URL || 'http://localhost:3000',
     isProduction: process.env.NODE_ENV === 'production',

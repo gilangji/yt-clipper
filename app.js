@@ -64,6 +64,9 @@ app.get('/', (req, res) => {
   res.render('index', { baseUrl: config.server.baseUrl });
 });
 
+// ===== Favicon: siluman 204 biar tidak noise 404 di log =====
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 // ===== API Routes =====
 app.use('/api', apiRoutes);
 
@@ -84,7 +87,7 @@ function start() {
     logger.warn('Aplikasi tetap dijalankan meskipun ada dependency eksternal yang hilang. Beberapa fitur mungkin gagal.');
   }
 
-  const server = app.listen(config.server.port, () => {
+  const server = app.listen(config.server.port, config.server.host, () => {
     logger.info(`YouTube Clipper berjalan di ${config.server.baseUrl} (env: ${config.server.env})`);
     startCleanupScheduler();
   });

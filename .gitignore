@@ -29,3 +29,6 @@ Thumbs.db
 # Local backup pulls dari HP (berisi secrets/API keys — jangan pernah di-push)
 .phone_pulls/
 pull-termux-config.sh
+
+# Kredensial Termux lokal (jangan pernah di-track)
+.termux-sync.env

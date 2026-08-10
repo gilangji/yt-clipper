@@ -108,6 +108,27 @@ node app.js
 ```
 Buka Google Chrome / Firefox di HP Android Anda, lalu akses **`http://localhost:3000`**.
 
+> 💡 **Manajemen server Android** tersedia: `bash start-android.sh` (pre-flight check binary + auto-heal + hold `python-ctranslate2`) dan `bash stop-android.sh` (stop bersih via PID file). Health check: `curl http://localhost:3000/api/health`.
+
+---
+
+## 🔒 Keamanan (Baca Sebelum Terhubung ke Jaringan)
+
+> ⚠️ **PENTING**: Secara default server bind ke `0.0.0.0` (semua interface) dan **TIDAK ada autentikasi**. Siapa pun di jaringan yang sama (WiFi/hotspot) bisa mengakses UI, memakai resource CPU/bandwidth, serta **mengunduh semua video di folder `downloads/` dan `output/`** (diserve statis).
+
+Jika hanya dipakai di satu perangkat, kunci akses dengan **bind ke localhost**:
+```bash
+# Hanya bisa diakses dari mesin yang sama (paling aman)
+HOST=127.0.0.1 node app.js
+```
+
+Jika tetap ingin diakses dari LAN/HP lain, minimal lakukan:
+1. **Batasi origin CORS**: set `CORS_ORIGIN=http://localhost:3000,http://192.168.x.x:3000` (bukan `*`).
+2. **Ganti port default**: `PORT=32123 node app.js` (hindari port umum).
+3. **Jangan expose ke internet** tanpa reverse-proxy berauth (mis. `nginx` + `htpasswd`) di depan.
+
+Konfigurasi lain yang aman untuk dibiarkan: `helmet` (CSP), `express-rate-limit` (anti brute), body limit `1mb`.
+
 ---
 
 ## 📖 Cara Pemakaian Fitur Web
