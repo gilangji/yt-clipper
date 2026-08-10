@@ -164,6 +164,10 @@ const config = {
 
   security: {
     corsOrigin: process.env.CORS_ORIGIN || '*',
+    // Basic Auth: aktif hanya jika KEDUANYA di-set via env.
+    // Contoh: APP_USER=admin APP_PASS=rahasia node app.js
+    authUser: process.env.APP_USER || null,
+    authPass: process.env.APP_PASS || null,
   },
 
   logging: {

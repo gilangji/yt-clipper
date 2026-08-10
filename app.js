@@ -11,6 +11,7 @@ const compression = require('compression');
 const config = require('./config');
 const logger = require('./utils/logger');
 const applySecurity = require('./middleware/security');
+const auth = require('./middleware/auth');
 const errorHandler = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
 const apiRoutes = require('./routes');
@@ -25,6 +26,8 @@ Object.values(config.folders).forEach(ensureDir);
 
 // ===== Security & Performance Middleware =====
 applySecurity(app);
+// Basic Auth (aktif jika APP_USER & APP_PASS di-set) — sebelum route & static
+app.use(auth);
 app.use(compression());
 
 // ===== Body Parser =====

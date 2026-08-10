@@ -123,9 +123,10 @@ HOST=127.0.0.1 node app.js
 ```
 
 Jika tetap ingin diakses dari LAN/HP lain, minimal lakukan:
-1. **Batasi origin CORS**: set `CORS_ORIGIN=http://localhost:3000,http://192.168.x.x:3000` (bukan `*`).
-2. **Ganti port default**: `PORT=32123 node app.js` (hindari port umum).
-3. **Jangan expose ke internet** tanpa reverse-proxy berauth (mis. `nginx` + `htpasswd`) di depan.
+1. **Aktifkan Basic Auth** (disarankan): set `APP_USER` dan `APP_PASS` di `.env` lalu restart — semua halaman, API, dan unduhan butuh login. `GET /health` & `GET /api/health` tetap publik untuk monitoring.
+2. **Batasi origin CORS**: set `CORS_ORIGIN=http://localhost:3000,http://192.168.x.x:3000` (bukan `*`).
+3. **Ganti port default**: `PORT=32123 node app.js` (hindari port umum).
+4. **Jangan expose ke internet** tanpa reverse-proxy berauth (mis. `nginx` + `htpasswd`) di depan.
 
 Konfigurasi lain yang aman untuk dibiarkan: `helmet` (CSP), `express-rate-limit` (anti brute), body limit `1mb`.
 
