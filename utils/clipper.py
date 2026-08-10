@@ -472,12 +472,13 @@ def main():
             
             if heatmap_overlay:
                 heatmap_accum *= 0.96
+                scale_factor = sf if (sf and sf > 0) else 1.0
                 if landmarks:
                     splat_points = []
-                    splat_points.append((cx - x, cy - y, 0.4, int(min(W_crop, H_crop) * 0.15)))
+                    splat_points.append((int((cx - x) / scale_factor), int((cy - y) / scale_factor), 0.4, int(min(W_crop, H_crop) * 0.15)))
                     for part, pt in landmarks.items():
-                        pt_x = int(pt[0] * W) - x
-                        pt_y = int(pt[1] * H) - y
+                        pt_x = int((int(pt[0] * W) - x) / scale_factor)
+                        pt_y = int((int(pt[1] * H) - y) / scale_factor)
                         intensity = 0.5 if 'eye' in part.lower() or 'mouth' in part.lower() else 0.3
                         sigma = int(min(W_crop, H_crop) * 0.05)
                         splat_points.append((pt_x, pt_y, intensity, sigma))
