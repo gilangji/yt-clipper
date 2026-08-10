@@ -18,6 +18,7 @@ const silenceService = require('./silence.service');
 const { JOB_STATUS } = require('../config/constants');
 const { buildOutputFilename } = require('../utils/filenameSanitizer');
 const { fileExists } = require('../utils/fileHelper');
+const { scanMedia } = require('../utils/mediaScanner');
 
 /**
  * Hitung dimensi kanvas output (W_out/H_out) — mirror utils/clipper.py.
@@ -296,6 +297,14 @@ async function processClipJob(jobId) {
     });
 
     logger.info('Job clip selesai', { jobId, outputFilename, durationSeconds });
+
+    // ===== HOOK: Media scan Android/Termux (biar video langsung muncul di Galeri) =====
+    // Best-effort: kalau bukan Android / termux-api tidak terpasang → di-skip diam-diam.
+    try {
+      await scanMedia(outputPath);
+    } catch (scanErr) {
+      logger.warn('Media scan hook error (non-fatal)', { jobId, error: scanErr.message });
+    }
   } catch (err) {
     logger.error('Job clip gagal', { jobId, error: err.message });
     jobService.updateJob(jobId, {
