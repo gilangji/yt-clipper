@@ -750,174 +750,8 @@
     // NOTE: headline tidak auto-fill — itu banner teks yang TERBAKAR permanen di video.
     // Biarkan kosong kecuali user mengisinya manual.
   }
-
-  // ===== Preview Subtitle (render nyata PNG) =====
-  function getActiveSubtitleTypography() {
-    return {
-      style: subtitleStyleSelect ? subtitleStyleSelect.value : 'quick-brown-inv',
-      fontSize: subtitleSizeSelect ? subtitleSizeSelect.value : 'large',
-      fontFamily: subtitleFontSelect ? subtitleFontSelect.value : 'auto',
-      textCase: subtitleCaseSelect ? subtitleCaseSelect.value : 'uppercase',
-      position: subtitlePosSelect ? subtitlePosSelect.value : 'bottom',
-    };
-  }
-
-  // ===== Auto-Clipper Custom Subtitle Config (ported from auto-clipper) =====
-  function getSubtitleConfig() {
-    const style = acModeKaraoke && acModeKaraoke.classList.contains('active') ? 'karaoke' : 'standard';
-    const activeFont = document.querySelector('#acFontFamilyGrid .ac-opt-btn.active');
-    const activeSize = document.querySelector('#acFontSizeGrid .ac-opt-btn.active');
-    const activeWeight = document.querySelector('#acFontWeightGrid .ac-opt-btn.active');
-    const isUpper = acUppercaseToggle ? acUppercaseToggle.classList.contains('active') : true;
-    const isItalic = acItalicToggle ? acItalicToggle.classList.contains('active') : false;
-    let highlight = '#FFE600';
-    if (acColorText && acColorText.value) {
-      const v = acColorText.value.trim().replace(/^#/, '');
-      if (/^[0-9a-fA-F]{6}$/.test(v)) highlight = '#' + v.toUpperCase();
-    }
-    return {
-      style,
-      highlight_color: highlight,
-      font_family: activeFont ? activeFont.dataset.font : 'Arial',
-      font_size_scale: activeSize ? parseFloat(activeSize.dataset.scale) : 1.0,
-      font_weight: activeWeight ? activeWeight.dataset.weight : 'bold',
-      italic: isItalic,
-      uppercase: isUpper,
-    };
-  }
-
   function isAutoClipperMode() {
-    return subtitleStyleSelect && subtitleStyleSelect.value === 'auto-clipper';
-  }
-
-  function getSubtitleConfigIfAuto() {
-    return isAutoClipperMode() ? getSubtitleConfig() : undefined;
-  }
-
-  function renderAcLivePreview() {
-    if (!acLivePreviewText) return;
-    const cfg = getSubtitleConfig();
-    const baseSize = 18 * cfg.font_size_scale;
-    const fontStyle = [
-      `font-family:${cfg.font_family}`,
-      `font-weight:${cfg.font_weight === 'bold' ? 700 : 400}`,
-      `font-style:${cfg.italic ? 'italic' : 'normal'}`,
-      `text-transform:${cfg.uppercase ? 'uppercase' : 'none'}`,
-      `font-size:${Math.round(baseSize)}px`,
-    ].join(';');
-    if (cfg.style === 'karaoke') {
-      acLivePreviewText.innerHTML =
-        `<span style="${fontStyle};color:#ffffff">BUAT KONTEN JADI LEBIH </span>` +
-        `<span class="ac-preview-word" style="${fontStyle};color:${cfg.highlight_color};text-shadow:0 0 10px ${cfg.highlight_color}66, 0 2px 4px rgba(0,0,0,.9), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;padding:2px 6px">VIRAL</span>` +
-        `<span style="${fontStyle};color:#ffffff"> SEKARANG</span>`;
-    } else {
-      acLivePreviewText.innerHTML =
-        `<span style="${fontStyle};color:#ffffff">Buat konten video Anda menjadi lebih menarik dan viral!</span>`;
-    }
-  }
-
-  function wireAcSubtitleControls() {
-    if (acModeKaraoke) acModeKaraoke.addEventListener('click', () => {
-      acModeKaraoke.classList.add('active');
-      if (acModeStandard) acModeStandard.classList.remove('active');
-      if (acModeBadge) acModeBadge.textContent = 'KARAOKE';
-      if (acHighlightLabel) acHighlightLabel.style.opacity = '1';
-      renderAcLivePreview();
-    });
-    if (acModeStandard) acModeStandard.addEventListener('click', () => {
-      acModeStandard.classList.add('active');
-      if (acModeKaraoke) acModeKaraoke.classList.remove('active');
-      if (acModeBadge) acModeBadge.textContent = 'STANDARD';
-      if (acHighlightLabel) acHighlightLabel.style.opacity = '0.45';
-      renderAcLivePreview();
-    });
-    acFontFamilyBtns.forEach(btn => btn.addEventListener('click', () => {
-      acFontFamilyBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      renderAcLivePreview();
-    }));
-    acFontSizeBtns.forEach(btn => btn.addEventListener('click', () => {
-      acFontSizeBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      renderAcLivePreview();
-    }));
-    acFontWeightBtns.forEach(btn => btn.addEventListener('click', () => {
-      acFontWeightBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      renderAcLivePreview();
-    }));
-    if (acUppercaseToggle) acUppercaseToggle.addEventListener('click', () => {
-      acUppercaseToggle.classList.toggle('active');
-      renderAcLivePreview();
-    });
-    if (acItalicToggle) acItalicToggle.addEventListener('click', () => {
-      acItalicToggle.classList.toggle('active');
-      renderAcLivePreview();
-    });
-    function setHighlightColor(color) {
-      const c = String(color || '#FFE600').toUpperCase();
-      acColorSwatches.forEach(s => {
-        s.classList.toggle('active', s.dataset.color.toUpperCase() === c);
-      });
-      if (acColorInput) acColorInput.value = /^#[0-9A-F]{6}$/i.test(c) ? c : '#FFE600';
-      if (acColorText) acColorText.value = c;
-      renderAcLivePreview();
-    }
-    acColorSwatches.forEach(s => s.addEventListener('click', () => setHighlightColor(s.dataset.color)));
-    if (acColorInput) acColorInput.addEventListener('input', (e) => setHighlightColor(e.target.value));
-    if (acColorText) acColorText.addEventListener('input', (e) => {
-      let v = e.target.value.trim();
-      if (/^[0-9a-fA-F]{6}$/.test(v)) v = '#' + v;
-      if (/^#[0-9a-fA-F]{6}$/.test(v)) {
-        setHighlightColor(v);
-      } else {
-        acColorSwatches.forEach(s => s.classList.remove('active'));
-        renderAcLivePreview();
-      }
-    });
-    renderAcLivePreview();
-  }
-  wireAcSubtitleControls();
-
-  if (previewSubtitleBtn) {
-    previewSubtitleBtn.addEventListener('click', async () => {
-      const t = getActiveSubtitleTypography();
-      const sampleText = 'RAHASIA\nSUKSES TANPA BATAS';
-      setButtonLoading(previewSubtitleBtn, true, 'Merender preview…');
-      try {
-        const res = await fetch('/api/subtitle/preview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...t, text: sampleText, subtitleConfig: getSubtitleConfigIfAuto() }),
-        });
-        if (!res.ok) throw new Error('Gagal render preview.');
-        const blob = await res.blob();
-        // Konversi blob → base64 data URL: CSP lama hanya izinkan img-src data:,
-        // blob: diblokir (kecuali setelah middleware/security.js di-restart).
-        const buf = await blob.arrayBuffer();
-        let bin = '';
-        const bytes = new Uint8Array(buf);
-        for (let i = 0; i < bytes.length; i += 0x8000) {
-          bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-        }
-        const dataUrl = 'data:image/png;base64,' + btoa(bin);
-        subtitlePreviewImg.src = dataUrl;
-        subtitlePreviewWrap.classList.remove('hidden');
-        const styleLabel = subtitleStyleSelect ? subtitleStyleSelect.options[subtitleStyleSelect.selectedIndex]?.textContent.trim() : t.style;
-        let badgeText =
-          `TEMPLATE: ${styleLabel}\nFONT: ${t.fontFamily === 'auto' ? '(dari template)' : t.fontFamily}\nSIZE: ${t.fontSize} · POS: ${t.position}`;
-        if (isAutoClipperMode()) {
-          const sc = getSubtitleConfig();
-          badgeText += `\nMODE: ${sc.style.toUpperCase()} · HIGHLIGHT: ${sc.highlight_color} · ${sc.font_family} ${sc.font_size_scale}x ${sc.font_weight}${sc.italic ? ' italic' : ''}${sc.uppercase ? ' · UPPER' : ''}`;
-        }
-        previewBadge.textContent = badgeText;
-        showToast('Preview subtitle siap!', 'success');
-      } catch (err) {
-        showToast('Preview gagal: ' + err.message, 'error');
-      } finally {
-        setButtonLoading(previewSubtitleBtn, false);
-      }
-    });
+    return false;
   }
 
   // ===== 9:16 Video Preview Controller =====
@@ -975,21 +809,12 @@
     }
 
     try {
-      const t = getActiveSubtitleTypography();
       const res = await apiRequest('/api/preview/video-916', {
         method: 'POST',
         body: JSON.stringify({
           videoPath: sourceVideoFilename,
           start: startSec,
           end: endSec,
-          subtitleStyle: t.style,
-          subtitleSize: t.fontSize,
-          subtitleFont: t.fontFamily,
-          subtitlePosition: t.position,
-          subtitleCase: t.textCase,
-          subtitleLanguage: t.language,
-          subtitleConfig: getSubtitleConfigIfAuto(),
-          withSubtitle: autoSubtitleToggle ? autoSubtitleToggle.checked : true,
           aspectRatio: '9:16'
         })
       });
@@ -2691,12 +2516,6 @@
         }
       }
 
-      const autoSubtitle = autoSubtitleToggle ? autoSubtitleToggle.checked : false;
-      const subtitleStyle = subtitleStyleSelect ? subtitleStyleSelect.value : 'quick-brown-inv';
-      const subtitleLanguage = subtitleLangSelect ? subtitleLangSelect.value : 'auto';
-      const subtitleFont = subtitleFontSelect ? subtitleFontSelect.value : 'auto';
-      const subtitleConfig = getSubtitleConfigIfAuto();
-
       try {
         const { data } = await apiRequest('/api/clip', {
           method: 'POST',
@@ -2708,14 +2527,9 @@
             crops: cropPoints,
             aspectRatio: aspect,
             heatmapOverlay: heatmap,
-          dynamicZoom,
-          audioEnhance,
-          silenceRemover,
-          autoSubtitle,
-            subtitleStyle,
-            subtitleLanguage,
-            subtitleFont,
-            subtitleConfig,
+            dynamicZoom,
+            audioEnhance,
+            silenceRemover,
           }),
         });
 
@@ -2818,19 +2632,9 @@
             dynamicZoom,
             audioEnhance,
             headlineText: q.headline || '',
-            autoSubtitle,
-            subtitleStyle,
-            subtitleSize,
-            subtitlePosition,
-            subtitleCase,
-            subtitleLanguage,
-            subtitleFont,
-            subtitleConfig,
             clipTitle: q.title || '',
             clipTags: q.tags || '',
             clipDescription: q.description || '',
-            bgmTrack,
-            bgmVolume,
           }),
         });
 
@@ -2987,22 +2791,10 @@
     const dynamicZoom = dynamicZoomToggle.checked;
     const audioEnhance = audioEnhanceToggle.checked;
     const silenceRemover = silenceRemoverToggle ? silenceRemoverToggle.checked : false;
-    const autoSubtitle = autoSubtitleToggle ? autoSubtitleToggle.checked : false;
-    const subtitleStyle = subtitleStyleSelect ? subtitleStyleSelect.value : 'quick-brown-inv';
-    const subtitleSize = subtitleSizeSelect ? subtitleSizeSelect.value : 'large';
-    const subtitlePosition = subtitlePosSelect ? subtitlePosSelect.value : 'bottom';
-    const subtitleCase = subtitleCaseSelect ? subtitleCaseSelect.value : 'uppercase';
-    const subtitleLanguage = subtitleLangSelect ? subtitleLangSelect.value : 'auto';
-    const subtitleFont = subtitleFontSelect ? subtitleFontSelect.value : 'auto';
-    const subtitleConfig = getSubtitleConfigIfAuto();
     const headline = headlineInput.value.trim();
     const clipTitle = metaClipTitle ? metaClipTitle.value.trim() : '';
     const clipTags = metaClipTags ? metaClipTags.value.trim() : '';
     const clipDescription = metaClipDesc ? metaClipDesc.value.trim() : '';
-    const bgmTrack = bgmTrackSelect ? bgmTrackSelect.value : 'none';
-    const bgmVolume = bgmVolumeSelect ? parseFloat(bgmVolumeSelect.value) : 0.10;
-    const watermarkText = document.getElementById('watermarkTextInput') ? document.getElementById('watermarkTextInput').value.trim() : '';
-    const watermarkPosition = document.getElementById('watermarkPosSelect') ? document.getElementById('watermarkPosSelect').value : 'bottomright';
 
     // Aktifkan indikator progress LIVE secara langsung
     startActiveProgressUI('⏱ Step 1/4: Menyiapkan parameter klip...', 12);
@@ -3035,21 +2827,9 @@
           audioEnhance,
           silenceRemover,
           headlineText: headline,
-          autoSubtitle,
-          subtitleStyle,
-          subtitleSize,
-          subtitlePosition,
-          subtitleCase,
-          subtitleLanguage,
-          subtitleFont,
-          subtitleConfig,
           clipTitle,
           clipTags,
-          clipDescription,
-          bgmTrack,
-          bgmVolume,
-          watermarkText,
-          watermarkPosition
+          clipDescription
         }),
       });
 

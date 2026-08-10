@@ -23,14 +23,6 @@ const createVideoPreview = asyncHandler(async (req, res) => {
     start,
     end,
     maxDuration,
-    subtitleStyle,
-    subtitleSize,
-    subtitleFont,
-    subtitlePosition,
-    subtitleCase,
-    subtitleLanguage,
-    subtitleConfig,
-    withSubtitle,
     aspectRatio,
   } = req.body || {};
 
@@ -44,14 +36,6 @@ const createVideoPreview = asyncHandler(async (req, res) => {
     start,
     end,
     maxDuration,
-    subtitleStyle,
-    subtitleSize,
-    subtitleFont,
-    subtitlePosition,
-    subtitleCase,
-    subtitleLanguage,
-    subtitleConfig,
-    withSubtitle: withSubtitle !== false,
     aspectRatio: aspectRatio || '9:16',
   });
 

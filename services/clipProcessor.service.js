@@ -170,53 +170,11 @@ async function processClipJob(jobId) {
       isSection = true;
     }
 
-    // ===== TAHAP 1.5: AUTO-SUBTITLE (jika diaktifkan) =====
-    // clipStart: offset transkripsi & pemotongan di dalam source file
-    //  - source full (useCache): mulai dari startSeconds (asli)
-    //  - source section (isSection): file sudah dipotong, mulai dari 0
+    // ===== TAHAP 1.5: SILENCE REMOVER & TIMING =====
     let clipStart = startSeconds;
     if (isSection) clipStart = 0;
 
-    let generatedAssPath = null;
-    if (job.autoSubtitle) {
-      jobService.updateJob(jobId, {
-        status: JOB_STATUS.ENCODING,
-        stage: 'Men-generate Subtitle AI (Whisper)...',
-        progress: 52,
-      });
-      try {
-        // PlayRes = ukuran kanvas output → font subtitle proporsional di semua resolusi
-        const resMapCheck = { '1080p': 1080, '720p': 720, '480p': 480, '360p': 360 };
-        let srcDims = null;
-        if (!resMapCheck[job.resolution]) {
-          // resolusi 'original'/auto → probe dimensi sumber
-          const probe = await probeVideoSize(finalSourcePath);
-          srcDims = { width: probe.width, height: probe.height };
-        }
-        const dims = computePlayCanvas(job.resolution, job.aspectRatio, srcDims?.width || 1920, srcDims?.height || 1080);
-
-        generatedAssPath = await subtitleService.generateSubtitleAss({
-          inputPath: finalSourcePath,
-          style: job.subtitleStyle || 'quick-brown-inv',
-          fontSize: job.subtitleSize || 'large',
-          position: job.subtitlePosition || 'bottom',
-          textCase: job.subtitleCase || 'uppercase',
-          language: job.subtitleLanguage || 'auto',
-          fontFamily: job.subtitleFont || 'auto',
-          subtitleConfig: job.subtitleConfig || null,
-          startSeconds: clipStart,
-          durationSeconds: durationSeconds,
-          width: dims.width,
-          height: dims.height
-        });
-      } catch (subErr) {
-        logger.warn('Gagal men-generate subtitle, melanjutkan clip tanpa subtitle...', { jobId, error: subErr.message });
-      }
-    }
-
-    // Siapkan finalCrops/finalTimeRanges di sini (bukan TAHAP 2) karena Silence Remover
-    // meng-override finalTimeRanges — deklarasi terlambat menyebabkan ReferenceError (TDZ)
-    // dan fitur selalu gagal. Default: hormati range start/end job bila timeRanges kosong.
+    // Siapkan finalCrops/finalTimeRanges
     let finalCrops = job.crops;
     let finalTimeRanges = job.timeRanges;
     if (!finalTimeRanges || finalTimeRanges.length === 0) {
@@ -281,9 +239,6 @@ async function processClipJob(jobId) {
       dynamicZoom: job.dynamicZoom,
       audioEnhance: job.audioEnhance,
       headlineText: job.headlineText,
-      subtitlePath: generatedAssPath,
-      bgmTrack: job.bgmTrack || 'none',
-      bgmVolume: job.bgmVolume || 0.10,
       onProgress: (percent) => {
         // Clipping/encoding porsi 55-100%
         const overall = 55 + Math.round(percent * 0.45);

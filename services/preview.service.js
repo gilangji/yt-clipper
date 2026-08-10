@@ -48,14 +48,6 @@ async function generateVideoPreview916({
   start = 0,
   end = 15,
   maxDuration = 30,
-  subtitleStyle = 'quick-brown-inv',
-  subtitleSize = 'large',
-  subtitleFont = 'auto',
-  subtitlePosition = 'bottom',
-  subtitleCase = 'uppercase',
-  subtitleLanguage = 'auto',
-  subtitleConfig,
-  withSubtitle = true,
   aspectRatio = '9:16',
 }) {
   if (!videoPath) {
@@ -97,13 +89,6 @@ async function generateVideoPreview916({
     baseName,
     startSec.toFixed(2),
     previewDuration.toFixed(2),
-    withSubtitle ? subtitleStyle : 'nosub',
-    withSubtitle ? subtitleSize : '',
-    withSubtitle ? subtitleFont : '',
-    withSubtitle ? subtitlePosition : '',
-    withSubtitle ? subtitleCase : '',
-    withSubtitle ? subtitleLanguage : '',
-    withSubtitle && subtitleConfig ? JSON.stringify(subtitleConfig) : '',
     aspectRatio
   ].join('|');
 
@@ -130,36 +115,7 @@ async function generateVideoPreview916({
     } catch (e) {}
   }
 
-  let assPath = null;
-  if (withSubtitle) {
-    try {
-      // Generate ASS subtitle pada resolusi preview vertikal 480x854
-      assPath = await subtitleService.generateSubtitleAss({
-        inputPath: absoluteSourcePath,
-        style: subtitleStyle,
-        fontSize: subtitleSize,
-        position: subtitlePosition,
-        textCase: subtitleCase,
-        language: subtitleLanguage,
-        fontFamily: subtitleFont,
-        subtitleConfig,
-        startSeconds: startSec,
-        durationSeconds: previewDuration,
-        width: 480,
-        height: 854
-      });
-    } catch (subErr) {
-      logger.warn('Subtitle preview gagal dibuat, render video tanpa subtitle', { error: subErr.message });
-      assPath = null;
-    }
-  }
-
-  // Bangun filter video FFmpeg untuk 9:16 vertical crop + ASS subtitle
   let vfFilter = 'crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=480:854:flags=lanczos';
-  if (assPath && fileExists(assPath)) {
-    const escapedAss = escapeAssFilterPath(assPath);
-    vfFilter += `,ass='${escapedAss}'`;
-  }
 
   const ffmpegBin = config.binaries.ffmpeg || 'ffmpeg';
   const ffmpegArgs = [

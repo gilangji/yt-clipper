@@ -30,7 +30,7 @@
     <section class="hero">
       <p class="eyebrow">SCOUT SIGNAL · TARGET DETEKSI VIDEO</p>
       <h1>Lacak momen emas di video YouTube, <span class="grad">klip viral siap kirim</span> dalam hitungan menit.</h1>
-      <p class="lede">Tempel tautan, tandai titik masuk &amp; keluar, tambahkan subtitle karaoke &amp; musik latar — langsung ekspor siap posting. Scout Console Clipper Teemo.</p>
+      <p class="lede">Tempel tautan, tandai titik masuk &amp; keluar, aktifkan pemotong jeda diam &amp; split-screen podcast — langsung ekspor siap posting. Scout Console Clipper Teemo.</p>
 
       <form id="urlForm" class="url-form" autocomplete="off" novalidate>
         <div id="dropzone" class="dropzone">
@@ -51,7 +51,7 @@
 
       <div class="hero-trust">
         <span>Tanpa unduh manual</span>
-        <span>Subtitle AI otomatis</span>
+        <span>AI Highlights Momen Viral</span>
         <span>Preset TikTok · Reels · Shorts</span>
       </div>
     </section>
@@ -175,11 +175,11 @@
         <div class="inspector-panel">
           <form id="clipForm" class="clip-form" autocomplete="off" novalidate>
 
-            <!-- 01 · Range & Output (accordion terbuka default) -->
+            <!-- 01 · Rentang, Rasio & Resolusi (accordion terbuka default) -->
             <details class="inspector-card" open>
               <summary class="card-title">
                 <span class="step-dot">1</span>
-                <span class="card-title-text">Rentang &amp; Output</span>
+                <span class="card-title-text">🎯 Rentang &amp; Output Video</span>
                 <span class="accordion-icon" aria-hidden="true"></span>
               </summary>
               <div class="card-body">
@@ -197,25 +197,25 @@
                 </div>
                 <div class="field-row">
                   <label>
-                    <span class="field-label">Resolusi</span>
+                    <span class="field-label">Rasio Layar</span>
+                    <select id="aspectRatioSelect" name="aspectRatio">
+                      <option value="9:16" selected>📱 9:16 Vertical (Shorts/TikTok/Reels)</option>
+                      <option value="9:16-dualsplit">👥 9:16 + Split 2 Tokoh (Kiri Atas / Kanan Bawah)</option>
+                      <option value="9:16-split">🎮 9:16 + Split Gameplay</option>
+                      <option value="1:1">🔳 1:1 Square (Instagram)</option>
+                      <option value="original">🖥️ Landscape (Original 16:9)</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="field-row">
+                  <label>
+                    <span class="field-label">Resolusi Output</span>
                     <select id="resolutionSelect" name="resolution">
                       <option value="original" selected>Original (Kualitas Asli)</option>
                       <option value="1080p">1080p (Full HD)</option>
                       <option value="720p">720p (HD)</option>
                       <option value="480p">480p (Hemat)</option>
                       <option value="360p">360p (Ringan)</option>
-                    </select>
-                  </label>
-                </div>
-                <div class="field-row">
-                  <label>
-                    <span class="field-label">Rasio Layar</span>
-                    <select id="aspectRatioSelect" name="aspectRatio">
-                      <option value="9:16" selected>9:16 Vertical (Shorts/TikTok/Reels)</option>
-                      <option value="9:16-dualsplit">👥 9:16 + Split 2 Tokoh (Kiri Atas / Kanan Bawah)</option>
-                      <option value="9:16-split">🎮 9:16 + Split Gameplay</option>
-                      <option value="1:1">1:1 Square (Instagram)</option>
-                      <option value="original">Landscape (Original 16:9)</option>
                     </select>
                   </label>
                 </div>
@@ -228,313 +228,59 @@
               </div>
             </details>
 
-            <!-- 02 · Efek -->
+            <!-- 02 · Efek & Audio -->
             <details class="inspector-card">
               <summary class="card-title">
                 <span class="dot">2</span>
-                <span class="card-title-text">Efek &amp; Pintasan</span>
+                <span class="card-title-text">⚡ Optimisasi Audio &amp; Kamera</span>
                 <span class="accordion-icon" aria-hidden="true"></span>
               </summary>
               <div class="card-body">
                 <div class="toggle-grid">
                   <label class="toggle-card">
-                    <input type="checkbox" id="autoSubtitleToggle" name="autoSubtitle" />
-                    <span class="switch"></span>
-                    <span class="toggle-text">💬 Auto Subtitle<span class="toggle-sub">Gaya Shorts (matikan = ekspor tanpa subtitle)</span></span>
-                  </label>
-                  <label class="toggle-card">
                     <input type="checkbox" id="silenceRemoverToggle" name="silenceRemover" checked />
                     <span class="switch"></span>
-                    <span class="toggle-text">⚡ Silence Remover<span class="toggle-sub">Potong jeda (>0.35s)</span></span>
-                  </label>
-                  <label class="toggle-card">
-                    <input type="checkbox" id="heatmapToggle" name="heatmapOverlay" />
-                    <span class="switch"></span>
-                    <span class="toggle-text">🫀 Heatmap Wajah<span class="toggle-sub">Burn tracking</span></span>
-                  </label>
-                  <label class="toggle-card">
-                    <input type="checkbox" id="dynamicZoomToggle" name="dynamicZoom" />
-                    <span class="switch"></span>
-                    <span class="toggle-text">🎥 Dynamic Zoom<span class="toggle-sub">Jump-cut</span></span>
+                    <span class="toggle-text">⚡ Silence Remover<span class="toggle-sub">Potong jeda diam (>0.35s)</span></span>
                   </label>
                   <label class="toggle-card">
                     <input type="checkbox" id="audioEnhanceToggle" name="audioEnhance" checked />
                     <span class="switch"></span>
-                    <span class="toggle-text">🔊 Jernihkan Audio<span class="toggle-sub">Denoise</span></span>
+                    <span class="toggle-text">🔊 Jernihkan Audio<span class="toggle-sub">Denoise &amp; Loudnorm</span></span>
+                  </label>
+                  <label class="toggle-card">
+                    <input type="checkbox" id="dynamicZoomToggle" name="dynamicZoom" />
+                    <span class="switch"></span>
+                    <span class="toggle-text">🎥 Dynamic Zoom<span class="toggle-sub">Jump-cut sinematik</span></span>
+                  </label>
+                  <label class="toggle-card">
+                    <input type="checkbox" id="heatmapToggle" name="heatmapOverlay" />
+                    <span class="switch"></span>
+                    <span class="toggle-text">🫀 Heatmap Wajah<span class="toggle-sub">Overlay penjejak</span></span>
                   </label>
                 </div>
               </div>
             </details>
 
-            <!-- 03 · Subtitle -->
-            <details id="subtitleOptionsRow" class="inspector-card accent-card">
-              <summary class="card-title">
-                <span class="dot">3</span>
-                <span class="card-title-text">🎨 Subtitle &amp; Typografi</span>
-                <span class="accordion-icon" aria-hidden="true"></span>
-              </summary>
-              <div class="card-body">
-                <div class="field-row">
-                  <label class="wide">
-                    <span class="field-label">Template</span>
-                    <select id="subtitleStyleSelect" name="subtitleStyle">
-                      <option value="auto-clipper" selected>🎛️ Kustom Auto-Clipper (Karaoke/Standard + Typografi Penuh)</option>
-                      <option value="quick-brown-inv">🦊 Quick Brown INVERSE (Kuning Dasar, Putih Berjalan)</option>
-                      <option value="quick-brown">🦊 The Quick Brown Fox (Karaoke Kuning CapCut)</option>
-                      <option value="mrbeast-white">🟥 MrBeast Pop (Kata-per-kata, Putih)</option>
-                      <option value="capcut-karaoke">🎵 CapCut Karaoke (Kuning Aktif)</option>
-                      <option value="capcut-box">📦 CapCut Box (Kotak Hitam)</option>
-                      <option value="capcut-neon">💡 CapCut Neon Cyan</option>
-                      <option value="capcut-rainbow">🌈 CapCut Rainbow (Pelangi)</option>
-                      <option value="capcut-ugc">🫶 CapCut UGC (Lowercase Aesthetic)</option>
-                      <option value="capcut-glow">✨ CapCut Glow (Cyan Shadow)</option>
-                      <option value="word-pop">🎤 Word Pop Karaoke (Kata Putih/Kuning)</option>
-                      <option value="archivo-black">⬛ Archivo Black (Modern Bold)</option>
-                      <option value="bebas-amber">🟨 Bebas Amber (Display Cap)</option>
-                      <option value="neon-pink">💗 Pink Neon Glow</option>
-                      <option value="glitch-green">🟢 Hacker Mono Green</option>
-                      <option value="gold-bold">👑 Gold Bold Premium</option>
-                      <option value="purple-holo">🔮 Purple Holo</option>
-                      <option value="minimal-white">🤍 Minimal White Clean</option>
-                      <option value="shadow-pop">🗯️ Shadow Pop (Soft Drop)</option>
-                      <option value="yellow-viral">🔥 Kuning Viral (Alex Hormozi)</option>
-                      <option value="vizard-classic">🎬 Vizard Classic (Putih Bersih + Outline Hitam)</option>
-                      <option value="vizard-pop">🎬 Vizard Pop (Kata Menonjol Hormozi-Style)</option>
-                      <option value="vizard-neon">🎬 Vizard Neon (Cyan Glow Menyala)</option>
-                      <option value="vizard-gradient">🎬 Vizard Gradient (Sweep Warna Hangat)</option>
-                      <option value="vizard-outline">🎬 Vizard Outline (Big Block Tebal)</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div class="field-row">
-                  <label>
-                    <span class="field-label">Ukuran Font</span>
-                    <select id="subtitleSizeSelect" name="subtitleSize">
-                      <option value="tiny">Kecil (22pt)</option>
-                      <option value="small">Standar (30pt)</option>
-                      <option value="medium">Sedang (40pt)</option>
-                      <option value="large" selected>Besar (52pt — Rekomendasi)</option>
-                      <option value="xlarge">Ekstra Besar (68pt — Punchy)</option>
-                      <option value="huge">Raksasa (86pt — Big Hook)</option>
-                      <option value="xxlarge">Monster (108pt — MrBeast Style)</option>
-                      <option value="colossal">Kolosal (135pt — Giant Screen Fill)</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div class="field-row">
-                  <label>
-                    <span class="field-label">Font</span>
-                    <select id="subtitleFontSelect" name="subtitleFont">
-                      <option value="auto" selected>Auto (dari Template)</option>
-                      <option value="Montserrat">Montserrat (Montserrat Bold)</option>
-                      <option value="Impact">Impact (Impact Punchy)</option>
-                      <option value="Anton">Anton (MrBeast Display)</option>
-                      <option value="Bebas Neue">Bebas Neue (Caps Bold)</option>
-                      <option value="Archivo Black">Archivo Black (Heavy)</option>
-                      <option value="Poppins">Poppins (Modern Clean)</option>
-                      <option value="Roboto">Roboto (Netral)</option>
-                      <option value="DejaVu Sans">DejaVu Sans (Universal)</option>
-                      <option value="JetBrainsMono Nerd Font">JetBrains Mono (Tech)</option>
-                      <option value="Noto Sans">Noto Sans (Multibahasa)</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div class="field-row">
-                  <label>
-                    <span class="field-label">Posisi</span>
-                    <select id="subtitlePosSelect" name="subtitlePosition">
-                      <option value="bottom" selected>Bawah Layar (Standar Shorts)</option>
-                      <option value="middle">Tengah Layar (Fokus POV)</option>
-                      <option value="top">Atas Layar</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div class="field-row">
-                  <label>
-                    <span class="field-label">Kapitalisasi</span>
-                    <select id="subtitleCaseSelect" name="subtitleCase">
-                      <option value="uppercase" selected>SEMUA HURUF BESAR (Viral)</option>
-                      <option value="lowercase">huruf kecil semua (Aesthetic)</option>
-                      <option value="titlecase">Kapital Tiap Kata</option>
-                      <option value="normal">Normal (Sentence Case)</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div class="field-row">
-                  <label>
-                    <span class="field-label">Bahasa Subtitle</span>
-                    <select id="subtitleLangSelect" name="subtitleLanguage">
-                      <option value="auto" selected>Otomatis (Deteksi AI)</option>
-                      <option value="id">🇮🇩 Indonesia</option>
-                      <option value="en">🇬🇧 English</option>
-                      <option value="ar">🇸🇦 العربية</option>
-                      <option value="es">🇪🇸 Español</option>
-                      <option value="ja">🇯🇵 日本語</option>
-                      <option value="ko">🇰🇷 한국어</option>
-                      <option value="zh">🇨🇳 中文</option>
-                      <option value="hi">🇮🇳 हिन्दी</option>
-                    </select>
-                  </label>
-                </div>
-
-                <!-- ===== AUTO-CLIPPER CUSTOM SUBTITLE SETTINGS (ported from auto-clipper) ===== -->
-                <div class="ac-subtitle-panel">
-                  <div class="ac-panel-title">🎛️ Kustomisasi Auto-Clipper <span class="ac-mode-badge" id="acModeBadge">KARAOKE</span></div>
-
-                  <!-- Mode Tampilan Subtitle -->
-                  <div class="ac-sec-title">Mode Tampilan Subtitle</div>
-                  <div class="ac-mode-grid">
-                    <button type="button" class="ac-mode-btn active" id="acModeKaraoke">
-                      <span class="ac-mode-name">✨ Karaoke (Word-by-word) <span class="ac-check">✓</span></span>
-                      <span class="ac-mode-desc">Setiap kata yang diucapkan akan menyala terang satu per satu, sangat cocok untuk video Shorts/TikTok.</span>
-                    </button>
-                    <button type="button" class="ac-mode-btn" id="acModeStandard">
-                      <span class="ac-mode-name">📄 Standar (Kalimat Penuh) <span class="ac-check">✓</span></span>
-                      <span class="ac-mode-desc">Menampilkan satu baris kalimat lengkap secara statis.</span>
-                    </button>
-                  </div>
-
-                  <!-- Live Preview -->
-                  <div class="ac-live-preview">
-                    <span class="ac-preview-label">👁️ Pratinjau Langsung Subtitle (Live Preview)</span>
-                    <div class="ac-preview-text" id="acLivePreviewText"></div>
-                  </div>
-
-                  <!-- Font Family -->
-                  <div class="ac-sec-title">Jenis Huruf (Font Family)</div>
-                  <div class="ac-font-grid" id="acFontFamilyGrid">
-                    <button type="button" class="ac-opt-btn active" data-font="Arial" style="font-family:Arial">Arial</button>
-                    <button type="button" class="ac-opt-btn" data-font="Montserrat" style="font-family:Montserrat">Montserrat</button>
-                    <button type="button" class="ac-opt-btn" data-font="Impact" style="font-family:Impact">Impact</button>
-                    <button type="button" class="ac-opt-btn" data-font="Roboto" style="font-family:Roboto">Roboto</button>
-                    <button type="button" class="ac-opt-btn" data-font="Oswald" style="font-family:Oswald">Oswald</button>
-                    <button type="button" class="ac-opt-btn" data-font="Bebas Neue" style="font-family:'Bebas Neue'">Bebas</button>
-                    <button type="button" class="ac-opt-btn" data-font="Courier New" style="font-family:'Courier New'">Courier</button>
-                  </div>
-
-                  <!-- Font Size & Weight -->
-                  <div class="ac-two-grid">
-                    <div>
-                      <div class="ac-sec-title">Ukuran Huruf (Font Size)</div>
-                      <div class="ac-size-grid" id="acFontSizeGrid">
-                        <button type="button" class="ac-opt-btn" data-scale="0.8">Kecil 0.8x</button>
-                        <button type="button" class="ac-opt-btn active" data-scale="1.0">Normal 1.0x</button>
-                        <button type="button" class="ac-opt-btn" data-scale="1.2">Besar 1.2x</button>
-                        <button type="button" class="ac-opt-btn" data-scale="1.5">Ekstra 1.5x</button>
-                      </div>
-                    </div>
-                    <div>
-                      <div class="ac-sec-title">Ketebalan Huruf (Font Weight)</div>
-                      <div class="ac-size-grid" id="acFontWeightGrid">
-                        <button type="button" class="ac-opt-btn" data-weight="normal">Normal</button>
-                        <button type="button" class="ac-opt-btn active" data-weight="bold">Tebal (Bold)</button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Text Styling -->
-                  <div class="ac-sec-title">Gaya Tambahan (Text Styling)</div>
-                  <div class="ac-style-row">
-                    <button type="button" class="ac-toggle-btn active" id="acUppercaseToggle">
-                      <span><span class="ac-aa">AA</span>&nbsp; HURUF BESAR SEMUA (UPPERCASE)</span>
-                      <span class="ac-check">✓</span>
-                    </button>
-                    <button type="button" class="ac-toggle-btn" id="acItalicToggle">
-                      <span><em class="ac-italic">I</em>&nbsp; Huruf Miring (Italic)</span>
-                      <span class="ac-check">✓</span>
-                    </button>
-                  </div>
-
-                  <!-- Highlight Color -->
-                  <div class="ac-sec-title" id="acHighlightLabel">Warna Sorotan Kata (Highlight Color)</div>
-                  <div class="ac-color-row" id="acColorRow">
-                    <button type="button" class="ac-color-swatch active" data-color="#FFE600" title="Yellow Neon" style="background:#FFE600"></button>
-                    <button type="button" class="ac-color-swatch" data-color="#00FFFF" title="Cyan Aqua" style="background:#00FFFF"></button>
-                    <button type="button" class="ac-color-swatch" data-color="#00FF66" title="Lime Green" style="background:#00FF66"></button>
-                    <button type="button" class="ac-color-swatch" data-color="#FF3366" title="Hot Pink" style="background:#FF3366"></button>
-                    <button type="button" class="ac-color-swatch" data-color="#FFFFFF" title="Pure White" style="background:#FFFFFF"></button>
-                    <button type="button" class="ac-color-swatch" data-color="#FF9900" title="Vibrant Orange" style="background:#FF9900"></button>
-                    <input type="color" id="acColorInput" class="ac-color-input" value="#FFE600" title="Custom color" />
-                    <input type="text" id="acColorText" class="ac-color-text" value="#FFE600" placeholder="#FFE600" maxlength="7" />
-                  </div>
-                </div>
-
-                <div class="sub-preview-area">
-                  <div class="sub-preview-head">
-                    <span class="sub-preview-title">🔍 Preview Subtitle</span>
-                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                      <button type="button" id="previewSubtitleBtn" class="btn btn-sm">🎬 Contoh PNG</button>
-                      <button type="button" id="previewRangeVideoBtn" class="btn btn-sm btn-primary" title="Preview video 9:16 nyata dengan subtitle berjalan">📱 Video 9:16 (Rentang)</button>
-                    </div>
-                  </div>
-                  <div id="subtitlePreviewWrap" class="sub-preview-wrap hidden">
-                    <div class="sub-preview-frame">
-                      <img id="subtitlePreviewImg" alt="Preview subtitle" />
-                    </div>
-                    <div id="previewBadge" class="sub-preview-badge"></div>
-                  </div>
-                  <div class="sub-preview-hint">Frame contoh 9:16 — sama persis dengan hasil ekspor.</div>
-                </div>
-              </div>
-            </details>
-
-            <!-- 04 · BGM -->
-            <details id="bgmOptionsRow" class="inspector-card">
-              <summary class="card-title">
-                <span class="dot">4</span>
-                <span class="card-title-text">🎵 Musik Latar &amp; Ducking</span>
-                <span class="accordion-icon" aria-hidden="true"></span>
-              </summary>
-              <div class="card-body">
-                <div class="field-row">
-                  <label>
-                    <span class="field-label">Pilih Musik</span>
-                    <select id="bgmTrackSelect" name="bgmTrack">
-                      <option value="none" selected>Tanpa BGM (Audio Asli Saja)</option>
-                      <option value="lofi">🎧 Lo-Fi Chill Ambient (Podcast)</option>
-                      <option value="upbeat">⚡ Upbeat Viral Pop (Shorts/Reels)</option>
-                      <option value="cinematic">🎬 Cinematic Suspense (Story)</option>
-                    </select>
-                  </label>
-                </div>
-                <div class="field-row">
-                  <label>
-                    <span class="field-label">Volume BGM (Ducking Otomatis)</span>
-                    <select id="bgmVolumeSelect" name="bgmVolume">
-                      <option value="0.10">Halus (10% — Rekomendasi)</option>
-                      <option value="0.18">Sedang (18%)</option>
-                      <option value="0.25">Keras (25%)</option>
-                    </select>
-                  </label>
-                </div>
-              </div>
-            </details>
-
-            <!-- 04.5 · Text-Based Video Editor -->
+            <!-- 03 · Text-Based Video Editor -->
             <details id="textBasedEditorPanel" class="inspector-card">
               <summary class="card-title">
-                <span class="dot">4.5</span>
+                <span class="dot">3</span>
                 <span class="card-title-text">✂️ Text-Based Video Editor</span>
                 <span class="accordion-icon" aria-hidden="true"></span>
               </summary>
               <div class="card-body">
                 <div class="field-hint" style="font-size: 11px; color: var(--muted); margin-bottom: 8px;">
-                  💡 Teks transkrip otomatis klip akan tampil di bawah ini. Hapus atau edit kata/kalimat di area teks ini untuk memotong audio/video secara presisi secepat mengedit dokumen Word.
+                  💡 Teks transkrip otomatis klip akan tampil di bawah ini. Edit kata/kalimat di area teks ini untuk memotong audio/video secara presisi secepat mengedit dokumen.
                 </div>
                 <textarea id="interactiveTranscriptEditor" rows="4" style="width:100%; font-size:12px; font-family: var(--font-mono); padding:8px; border-radius:8px; background:var(--bg-alt); border:1px solid var(--border); color:var(--text);" placeholder="Teks transkrip klip akan otomatis dimuat di sini saat segmen highlight dipilih..."></textarea>
               </div>
             </details>
 
-            <!-- 05 · Metadata AI & Custom Branding -->
+            <!-- 04 · Metadata Konten AI -->
             <details id="contentMetadataPanel" class="inspector-card">
               <summary class="card-title">
-                <span class="dot">5</span>
-                <span class="card-title-text">📝 Metadata Konten AI &amp; Watermark</span>
+                <span class="dot">4</span>
+                <span class="card-title-text">📝 Metadata Konten AI (Gemini)</span>
                 <span class="accordion-icon" aria-hidden="true"></span>
               </summary>
               <div class="card-body">
@@ -546,7 +292,7 @@
                 </div>
                 <div class="meta-fields">
                   <label>
-                    <span class="field-label">🔑 Google Gemini API Key (Model Hemat Kuota: gemini-2.5-flash)</span>
+                    <span class="field-label">🔑 Google Gemini API Key</span>
                     <input type="password" id="geminiApiKeyInput" name="geminiApiKey" placeholder="AIzaSy... (Opsional - tempel API Key Gemini kamu)" />
                   </label>
                   <label>
@@ -558,21 +304,8 @@
                     <input type="text" id="metaClipTags" name="clipTags" placeholder="#Shorts #TikTokViral #Edukasi..." />
                   </label>
                   <label>
-                    <span class="field-label">Deskripsi / Caption (Siap Copas)</span>
+                    <span class="field-label">Deskripsi / Caption</span>
                     <textarea id="metaClipDesc" name="clipDescription" rows="3" placeholder="Deskripsi lengkap dan call-to-action untuk postingan..."></textarea>
-                  </label>
-                  <label>
-                    <span class="field-label">🏷️ Watermark / Brand Text</span>
-                    <input type="text" id="watermarkTextInput" name="watermarkText" placeholder="misal: @nama_brand_kamu" />
-                  </label>
-                  <label>
-                    <span class="field-label">Posisi Watermark</span>
-                    <select id="watermarkPosSelect" name="watermarkPosition">
-                      <option value="bottomright" selected>Pojok Kanan Bawah</option>
-                      <option value="topright">Pojok Kanan Atas</option>
-                      <option value="topleft">Pojok Kiri Atas</option>
-                      <option value="bottomleft">Pojok Kiri Bawah</option>
-                    </select>
                   </label>
                 </div>
               </div>
@@ -580,7 +313,7 @@
 
             <p id="clipError" class="field-error" hidden></p>
 
-            <label class="ai-highlight-toggle" title="Gunakan AI untuk memilih momen viral berdasarkan transkrip konten (ala auto-clipper / Opus Clip). Jatuh otomatis ke analisis audio bila tanpa API key.">
+            <label class="ai-highlight-toggle" title="Gunakan AI untuk memilih momen viral berdasarkan transkrip konten (ala auto-clipper / Opus Clip).">
               <input type="checkbox" id="aiViralModeCheck" checked />
               <span class="toggle-label">✨ AI Viral Clips <small>(pilih momen via transkrip — butuh API Key Gemini)</small></span>
             </label>

@@ -299,9 +299,6 @@ def main():
     dynamic_zoom = cfg.get('dynamicZoom', False)
     audio_enhance = cfg.get('audioEnhance', False)
     headline_text = cfg.get('headlineText', '')
-    subtitle_path = cfg.get('subtitlePath', '')
-    bgm_track = cfg.get('bgmTrack', 'none')
-    bgm_volume = float(cfg.get('bgmVolume', 0.10))
     resolution = cfg.get('resolution')
     
     W, H, duration, fps = get_video_specs(ffprobe_path, input_path)
@@ -383,39 +380,19 @@ def main():
                 '-ss', '10', '-t', str(dur),
             ]
             
-        bgm_file_map = {
-            'lofi': 'lofi-ambient.mp3',
-            'upbeat': 'upbeat-viral.mp3',
-            'cinematic': 'cinematic-suspense.mp3'
-        }
-        selected_bgm = bgm_file_map.get(bgm_track)
-        bgm_full_path = os.path.join(os.path.dirname(__file__), '..', 'public', 'bgm', selected_bgm) if selected_bgm else None
-
-        if bgm_full_path and os.path.exists(bgm_full_path):
-            cmd_out += ['-stream_loop', '-1', '-i', bgm_full_path]
-            filter_chain = f"[1:a]asetpts=PTS-STARTPTS[a1];[2:a]volume={bgm_volume}[a2];[a1][a2]amix=inputs=2:duration=first[aout]"
-            if audio_enhance:
-                filter_chain = f"[1:a]asetpts=PTS-STARTPTS,afftdn,loudnorm[a1];[2:a]volume={bgm_volume}[a2];[a1][a2]amix=inputs=2:duration=first[aout]"
+        if audio_enhance:
             cmd_out += [
-                '-map', '0:v', '-map', '[aout]',
-                '-c:a', 'aac', '-b:a', '192k',
-                '-filter_complex', filter_chain,
+                '-map', '0:v', '-map', '1:a?',
+                '-af', 'asetpts=PTS-STARTPTS,afftdn,loudnorm',
                 '-shortest'
             ]
         else:
-            if audio_enhance:
-                cmd_out += [
-                    '-map', '0:v', '-map', '1:a?',
-                    '-af', 'asetpts=PTS-STARTPTS,afftdn,loudnorm',
-                    '-shortest'
-                ]
-            else:
-                cmd_out += [
-                    '-map', '0:v', '-map', '1:a?',
-                    '-c:a', 'aac', '-b:a', '192k',
-                    '-af', 'asetpts=PTS-STARTPTS',
-                    '-shortest'
-                ]
+            cmd_out += [
+                '-map', '0:v', '-map', '1:a?',
+                '-c:a', 'aac', '-b:a', '192k',
+                '-af', 'asetpts=PTS-STARTPTS',
+                '-shortest'
+            ]
         has_audio = True
     else:
         cmd_out += [
@@ -430,10 +407,6 @@ def main():
             v_filters.append(f"drawtext=fontfile='{font_path}':text='{escaped_text}':fontcolor=white:fontsize=28:box=1:boxcolor=black@0.6:boxborderw=15:x=(w-text_w)/2:y=40")
         else:
             v_filters.append(f"drawtext=text='{escaped_text}':fontcolor=white:fontsize=28:box=1:boxcolor=black@0.6:boxborderw=15:x=(w-text_w)/2:y=40")
-
-    if subtitle_path and os.path.exists(subtitle_path):
-        escaped_sub = subtitle_path.replace('\\', '/').replace(':', '\\:').replace("'", "'\\\\''")
-        v_filters.append(f"ass='{escaped_sub}'")
 
     if v_filters:
         cmd_out += ['-vf', ",".join(v_filters)]
