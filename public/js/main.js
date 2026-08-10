@@ -794,6 +794,41 @@
   }
 
   // ===== Generate AI Metadata Button (konten-aware dengan fallback template) =====
+  const aiGenerateCaptionBtn = document.getElementById('aiGenerateCaptionBtn');
+  const geminiApiKeyInput = document.getElementById('geminiApiKeyInput');
+
+  if (aiGenerateCaptionBtn) {
+    aiGenerateCaptionBtn.addEventListener('click', async () => {
+      const topic = (metaClipTitle ? metaClipTitle.value.trim() : '') || videoTitle.textContent.trim() || 'Klip Viral';
+      const userApiKey = geminiApiKeyInput ? geminiApiKeyInput.value.trim() : '';
+
+      const originalHTML = aiGenerateCaptionBtn.innerHTML;
+      aiGenerateCaptionBtn.disabled = true;
+      aiGenerateCaptionBtn.innerHTML = '🤖 Menghasilkan (Gemini 2.5 Flash)…';
+
+      try {
+        const { data } = await apiRequest('/api/social/generate-caption', {
+          method: 'POST',
+          body: JSON.stringify({
+            clipTitle: topic,
+            apiKey: userApiKey
+          })
+        });
+
+        if (data.title && metaClipTitle) metaClipTitle.value = data.title;
+        if (data.hashtags && metaClipTags) metaClipTags.value = Array.isArray(data.hashtags) ? data.hashtags.join(' ') : data.hashtags;
+        if (data.caption && metaClipDesc) metaClipDesc.value = `${data.caption}\n\n${Array.isArray(data.hashtags) ? data.hashtags.join(' ') : ''}`;
+
+        showToast('Caption, Judul & Hashtag hemat kuota (Gemini 2.5 Flash) berhasil dibuat!', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        aiGenerateCaptionBtn.disabled = false;
+        aiGenerateCaptionBtn.innerHTML = originalHTML;
+      }
+    });
+  }
+
   if (generateMetaBtn) {
     generateMetaBtn.addEventListener('click', async () => {
       const startSec = timeToSeconds(startInput.value) || 0;
@@ -2532,6 +2567,8 @@
     const clipDescription = metaClipDesc ? metaClipDesc.value.trim() : '';
     const bgmTrack = bgmTrackSelect ? bgmTrackSelect.value : 'none';
     const bgmVolume = bgmVolumeSelect ? parseFloat(bgmVolumeSelect.value) : 0.10;
+    const watermarkText = document.getElementById('watermarkTextInput') ? document.getElementById('watermarkTextInput').value.trim() : '';
+    const watermarkPosition = document.getElementById('watermarkPosSelect') ? document.getElementById('watermarkPosSelect').value : 'bottomright';
 
     // Aktifkan indikator progress LIVE secara langsung
     startActiveProgressUI('⏱ Step 1/4: Menyiapkan parameter klip...', 12);
@@ -2575,7 +2612,9 @@
           clipTags,
           clipDescription,
           bgmTrack,
-          bgmVolume
+          bgmVolume,
+          watermarkText,
+          watermarkPosition
         }),
       });
 

@@ -45,7 +45,9 @@ const startClip = asyncHandler(async (req, res) => {
     clipTags = '',
     clipDescription = '',
     bgmTrack = 'none',
-    bgmVolume = 0.10
+    bgmVolume = 0.10,
+    watermarkText = '',
+    watermarkPosition = 'bottomright'
   } = req.body;
 
   const videoId = extractVideoId(url);
@@ -98,7 +100,9 @@ const startClip = asyncHandler(async (req, res) => {
     clipTags,
     clipDescription,
     bgmTrack,
-    bgmVolume
+    bgmVolume,
+    watermarkText,
+    watermarkPosition
   });
 
   logger.info('Job clip baru didaftarkan', {

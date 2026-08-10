@@ -285,6 +285,8 @@
                 <span class="field-label">Font</span>
                 <select id="subtitleFontSelect" name="subtitleFont">
                   <option value="auto" selected>Auto (dari Template)</option>
+                  <option value="Montserrat">Montserrat (Montserrat Bold)</option>
+                  <option value="Impact">Impact (Impact Punchy)</option>
                   <option value="Anton">Anton (MrBeast Display)</option>
                   <option value="Bebas Neue">Bebas Neue (Caps Bold)</option>
                   <option value="Archivo Black">Archivo Black (Heavy)</option>
@@ -378,18 +380,22 @@
             </div>
           </div>
 
-          <!-- 05 · Metadata AI -->
+          <!-- 05 · Metadata AI & Custom Branding -->
           <div id="contentMetadataPanel" class="inspector-card">
             <div class="meta-actions">
               <div class="card-title" style="margin-bottom:0;">
-                <span class="dot">5</span> 📝 Metadata Konten AI
+                <span class="dot">5</span> 📝 Metadata Konten AI &amp; Watermark Brand
               </div>
               <div class="meta-btn-group">
+                <button type="button" id="aiGenerateCaptionBtn" class="btn btn-primary btn-sm">🤖 Generate Caption (Gemini AI)</button>
                 <button type="button" id="saveToQueueBtn" class="btn btn-sm">🗂️ Simpan ke Antrian</button>
-                <button type="button" id="generateMetaBtn" class="btn btn-ghost btn-sm">⚡ Generate Ulang</button>
               </div>
             </div>
             <div class="meta-fields">
+              <label>
+                <span class="field-label">🔑 Google Gemini API Key (Model Hemat Kuota: gemini-2.5-flash)</span>
+                <input type="password" id="geminiApiKeyInput" name="geminiApiKey" placeholder="AIzaSy... (Opsional - tempel API Key Gemini kamu)" />
+              </label>
               <label>
                 <span class="field-label">Judul (Click-Worthy)</span>
                 <input type="text" id="metaClipTitle" name="clipTitle" placeholder="Judul menarik untuk video..." />
@@ -402,6 +408,22 @@
                 <span class="field-label">Deskripsi / Caption (Siap Copas)</span>
                 <textarea id="metaClipDesc" name="clipDescription" rows="3" placeholder="Deskripsi lengkap dan call-to-action untuk postingan..."></textarea>
               </label>
+
+              <div class="field-row" style="margin-top: 10px;">
+                <label>
+                  <span class="field-label">🏷️ Watermark / Brand Text</span>
+                  <input type="text" id="watermarkTextInput" name="watermarkText" placeholder="misal: @nama_brand_kamu" />
+                </label>
+                <label>
+                  <span class="field-label">Posisi Watermark</span>
+                  <select id="watermarkPosSelect" name="watermarkPosition">
+                    <option value="bottomright" selected>Pojok Kanan Bawah</option>
+                    <option value="topright">Pojok Kanan Atas</option>
+                    <option value="topleft">Pojok Kiri Atas</option>
+                    <option value="bottomleft">Pojok Kiri Bawah</option>
+                  </select>
+                </label>
+              </div>
             </div>
           </div>
 

@@ -4,8 +4,9 @@
 
 const express = require('express');
 const router = express.Router();
-const { publishClip } = require('../controllers/social.controller');
+const { publishClip, generateCaption } = require('../controllers/social.controller');
 
 router.post('/publish', publishClip);
+router.post('/generate-caption', generateCaption);
 
 module.exports = router;

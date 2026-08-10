@@ -7,10 +7,31 @@ const path = require('path');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 const replizService = require('../services/repliz.service');
+const aiService = require('../services/ai.service');
 const jobService = require('../services/job.service');
 const config = require('../config');
 const { fileExists } = require('../utils/fileHelper');
 const { JOB_STATUS, ERROR_CODES } = require('../config/constants');
+
+const generateCaption = asyncHandler(async (req, res) => {
+  const { clipTitle, transcript, apiKey } = req.body;
+
+  if (!clipTitle) {
+    throw AppError.badRequest('clipTitle / topik wajib diisi.');
+  }
+
+  const result = await aiService.generateSocialContent({
+    clipTitle,
+    transcript,
+    apiKey
+  });
+
+  res.json({
+    success: true,
+    message: 'Caption & Hashtag viral berhasil dihasilkan oleh AI (Gemini 2.5 Flash)!',
+    data: result,
+  });
+});
 
 const publishClip = asyncHandler(async (req, res) => {
   const { jobId, caption, platforms = ['tiktok', 'instagram', 'youtube'], scheduleAt = null } = req.body;
@@ -51,4 +72,4 @@ const publishClip = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { publishClip };
+module.exports = { publishClip, generateCaption };

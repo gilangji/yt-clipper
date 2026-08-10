@@ -95,9 +95,10 @@ def get_crop_center(t, crops, W, H):
         t0, t1 = c0['time'], c1['time']
         if t0 <= t <= t1:
             alpha = (t - t0) / (t1 - t0) if t1 > t0 else 0.0
-            # Linear lerp presisi tinggi — kamera mengikuti gerakan pembicara secara responsif tanpa delay
-            cx = c0['cx'] + alpha * (c1['cx'] - c0['cx'])
-            cy = c0['cy'] + alpha * (c1['cy'] - c0['cy'])
+            # Smoothstep Hermite interpolation (3*a^2 - 2*a^3) untuk pergerakan kamera sinematik yang sangat halus (tanpa jitter)
+            smooth_alpha = alpha * alpha * (3.0 - 2.0 * alpha)
+            cx = c0['cx'] + smooth_alpha * (c1['cx'] - c0['cx'])
+            cy = c0['cy'] + smooth_alpha * (c1['cy'] - c0['cy'])
             
             l0, l1 = c0.get('landmarks'), c1.get('landmarks')
             landmarks = None
@@ -106,8 +107,8 @@ def get_crop_center(t, crops, W, H):
                 for k in l0.keys():
                   if k in l1:
                     landmarks[k] = [
-                        l0[k][0] + alpha * (l1[k][0] - l0[k][0]),
-                        l0[k][1] + alpha * (l1[k][1] - l0[k][1])
+                        l0[k][0] + smooth_alpha * (l1[k][0] - l0[k][0]),
+                        l0[k][1] + smooth_alpha * (l1[k][1] - l0[k][1])
                     ]
             elif l0:
                 landmarks = l0
