@@ -158,7 +158,7 @@ function clipVideo({ inputPath, outputPath, startSeconds, durationSeconds, resol
   }
 
   if (audioEnhance) {
-    command.audioFilters('afftdn', 'loudnorm');
+    command.audioFilters('afftdn=nr=12:nf=-25', 'highpass=f=80', 'lowpass=f=12000', 'loudnorm=I=-16:TP=-1.5:LRA=11');
   }
 
   const targetHeight = RESOLUTION_HEIGHT_MAP[resolution];

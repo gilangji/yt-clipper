@@ -465,16 +465,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     return header
 
 EMOJI_RULES = {
-    'uang': '💵 UANG', 'money': '💵 MONEY', 'kaya': '💰 KAYA', 'rich': '💰 RICH', 'dolar': '💵 DOLAR',
+    'uang': '💵 UANG', 'money': '💵 MONEY', 'kaya': '💰 KAYA', 'rich': '💰 RICH', 'dolar': '💵 DOLAR', 'harga': '🏷️ HARGA',
     'sukses': '🚀 SUKSES', 'success': '🚀 SUCCESS', 'menang': '🏆 MENANG', 'juara': '🏆 JUARA',
-    'semangat': '🔥 SEMANGAT', 'fire': '🔥 FIRE', 'viral': '🔥 VIRAL', 'hot': '🔥 HOT',
-    'otak': '🧠 OTAK', 'brain': '🧠 BRAIN', 'pikir': '🧠 PIKIR', 'mindset': '🧠 MINDSET', 'fakta': '💡 FAKTA',
-    'waktu': '⏱️ WAKTU', 'time': '⏱️ TIME', 'jam': '⏱️ JAM',
-    'rahasia': '🤫 RAHASIA', 'secret': '🤫 SECRET', 'diam': '🤫 DIAM',
+    'semangat': '🔥 SEMANGAT', 'fire': '🔥 FIRE', 'viral': '🔥 VIRAL', 'hot': '🔥 HOT', 'api': '🔥 API',
+    'otak': '🧠 OTAK', 'brain': '🧠 BRAIN', 'pikir': '🧠 PIKIR', 'mindset': '🧠 MINDSET', 'fakta': '💡 FAKTA', 'ide': '💡 IDE', 'tahu': '💡 TAHU', 'trik': '💡 TRIK', 'solusi': '💡 SOLUSI',
+    'waktu': '⏱️ WAKTU', 'time': '⏱️ TIME', 'jam': '⏱️ JAM', 'cepat': '⚡ CEPAT', 'fast': '⚡ FAST',
+    'rahasia': '🤫 RAHASIA', 'secret': '🤫 SECRET', 'diam': '🤫 DIAM', 'kunci': '🔑 KUNCI',
     'salah': '❌ SALAH', 'gagal': '❌ GAGAL', 'stop': '❌ STOP', 'jangan': '❌ JANGAN',
     'target': '🎯 TARGET', 'fokus': '🎯 FOKUS', 'goal': '🎯 GOAL',
-    'bahaya': '⚠️ BAHAYA', 'warning': '⚠️ WARNING',
-    'cinta': '❤️ CINTA', 'love': '❤️ LOVE', 'suka': '❤️ SUKA'
+    'bahaya': '⚠️ BAHAYA', 'warning': '⚠️ WARNING', 'rusak': '⚠️ RUSAK', 'error': '⚠️ ERROR',
+    'cinta': '❤️ CINTA', 'love': '❤️ LOVE', 'suka': '❤️ SUKA',
+    'tidur': '😴 TIDUR', 'sleep': '😴 SLEEP', 'kaget': '😱 KAGET', 'takut': '😱 TAKUT', 'raja': '👑 RAJA', 'king': '👑 KING'
 }
 
 def inject_emojis_to_text(text):
