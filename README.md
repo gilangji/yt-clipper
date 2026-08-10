@@ -1,16 +1,19 @@
-# 🎬 YouTube Clipper (Clipreel)
+# 🎬 YouTube Clipper (Clipreel Studio)
 
-Aplikasi pemotong dan pengolah video YouTube berbasis web (Node.js & Python) yang efisien, cepat, dan presisi. Memungkinkan Anda memotong segmen video YouTube, mengonversi ke format vertikal (9:16 Shorts/TikTok/Reels), menambahkan efek visual, serta membersihkan audio tanpa perlu mengunduh keseluruhan berkas video secara manual.
+Aplikasi pemotong dan pengolah video YouTube berbasis web (Node.js & Python) yang efisien, cepat, dan presisi. Memungkinkan Anda memotong segmen video YouTube, mengonversi ke format vertikal (9:16 Shorts/TikTok/Reels), menambahkan subtitle otomatis & style karaoke, musik latar (BGM), deteksi highlights AI, serta membersihkan audio tanpa perlu mengunduh keseluruhan berkas video secara manual.
 
 ---
 
-## 🚀 Fitur Utama
+## 🚀 Fitur Utama & Pembaruan Terbaru
 
+- **🔥 Deteksi Highlights Otomatis**: Analisis AI untuk menemukan momen menarik & fluktuasi audio terbaik secara otomatis.
 - **⚡ Fast Stream Trimming**: Memotong bagian video spesifik langsung menggunakan `yt-dlp` & `FFmpeg` tanpa membuang bandwidth.
 - **📱 Smooth 9:16 Vertical Crop**: Pergerakan kamera *Smoothstep* yang alami untuk fokus pada pembicara/objek (Shorts/TikTok).
 - **🎮 Split-Screen Gameplay**: Format setengah layar atas pembicara dan setengah layar bawah efek audio/visual dinamis.
+- **📝 Subtitle & Style Karaoke**: Pilihan 24+ preset style subtitle (Karaoke Kuning, MrBeast Pop, CapCut Neon, dll.).
+- **🎵 Background Music (BGM)**: Pilihan musik latar bawaan (*Cinematic, Lofi, Upbeat*) dengan pengaturan volume audio.
+- **⚡ Silence Remover**: Memotong jeda diam secara otomatis (>0.35s) untuk meningkatkan retensi penonton.
 - **🔊 Penjernih Audio (Denoise)**: Membersihkan noise latar belakang dan menormalkan volume audio (`loudnorm`).
-- **🍪 Cookie Bypass**: Penanganan video *Age-Restricted* atau pembatasan IP YouTube menggunakan berkas `cookies.txt` atau browser cookies.
 - **📱 Android Termux Ready**: Kompatibel 100% untuk dijalankan secara lokal di HP Android melalui emulator **Termux**.
 - **🧹 Instant Temp Cleanup**: Pembersihan berkas temporer secara proaktif begitu pemrosesan selesai.
 
@@ -101,23 +104,16 @@ Buka Google Chrome / Firefox di HP Android Anda, lalu akses **`http://localhost:
 
 1. **Muat Video**: Tempelkan URL video YouTube di kolom input, lalu klik **"Muat Video"**.
 2. **Tentukan Rentang Waktu**:
-   - Isi manual kolom **IN (start)** dan **OUT (end)** dengan format `HH:MM:SS`.
+   - Klik **"🔥 Deteksi Highlights Otomatis"** untuk menemukan segmen terbaik secara otomatis via AI.
+   - Atau isi manual kolom **IN (start)** dan **OUT (end)** dengan format `HH:MM:SS`.
    - Atau geser garis penanda timeline ruler di bawah preview video.
-   - Atau klik **"🔥 Deteksi Highlights Otomatis"** untuk memilih momen terbaik secara instan.
-3. **Pilih Aspect Ratio & Efek**:
+3. **Pilih Aspect Ratio, Subtitle & Efek**:
    - Pilih rasio output: *Landscape (Original)*, *9:16 Vertical*, *9:16 + Split Gameplay*, atau *1:1 Square*.
+   - Pilih style Subtitle, Musik Latar (BGM), dan aktifkan **Silence Remover** jika diinginkan.
    - Centang opsi **Denoise & Penjernih Suara** jika ingin suara lebih jernih.
-4. **Ekspor & Unduh**: Klik **"Potong & Ekspor Clip"**, tunggu proses selesai, lalu klik **"Download"**.
+4. **Ekspor & Unduh**: Klik **"🔥 Deteksi Highlights Otomatis"** / **"Ekspor Clip"**, tunggu proses selesai, lalu klik **"Download"**.
 
 ---
 
 ## 📄 Lisensi
 [MIT License](LICENSE)
-
-3. **Fallback Dynamic Zoom saat Deteksi Wajah Gagal**:
-   - Skrip `clipper.py` mengandalkan kecerdasan buatan untuk face tracking saat vertical crop/dynamic zoom. Jika video tidak mendeteksi wajah sama sekali, koordinat crop terkadang langsung melompat kembali ke titik tengah (center frame).
-   - **Saran**: Buat transisi smooth (interpolasi koordinat) saat wajah hilang dari kamera agar transisi crop tidak terlalu patah/melompat (jittery).
-
-4. **Optimalisasi Penyimpanan (Temp Cleanup)**:
-   - Proses pembuatan klip menghasilkan potongan video mentah (.part/.mp4) di dalam direktori `temp/` dan `downloads/` yang cukup besar.
-   - **Saran**: Lakukan penghapusan instan terhadap file temporer (`temp/cfg_*.json` dan file segmentasi audio/video parsial) sesaat setelah proses gabung/render klip selesai di `ffmpeg.service.js`, bukan hanya mengandalkan scheduler pembersih per 30 menit.
