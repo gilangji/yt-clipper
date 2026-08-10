@@ -12,5 +12,9 @@ router.use('/status', require('./status.routes'));
 router.use('/download', require('./download.routes'));
 router.use('/delete', require('./delete.routes'));
 router.use('/highlights', require('./highlights.routes'));
+router.use('/metadata', require('./metadata.routes'));
+router.use('/subtitle', require('./subtitle.routes'));
+router.use('/preview', require('./preview.routes'));
+router.use('/social', require('./social.routes'));
 
 module.exports = router;

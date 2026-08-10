@@ -53,7 +53,7 @@ function runCommand(command, outputPath, onProgress) {
 /**
  * Jalankan python frame clipper untuk render vertical cropping.
  */
-function runPythonClipper({ inputPath, outputPath, crops, aspectRatio, timeRanges, heatmapOverlay, dynamicZoom, audioEnhance, headlineText, onProgress, resolution }) {
+function runPythonClipper({ inputPath, outputPath, crops, aspectRatio, timeRanges, heatmapOverlay, dynamicZoom, audioEnhance, headlineText, subtitlePath, bgmTrack, bgmVolume, onProgress, resolution }) {
   return new Promise((resolve, reject) => {
     const configId = uuidv4();
     const configPath = path.join(config.folders.temp, `cfg_${configId}.json`);
@@ -70,6 +70,9 @@ function runPythonClipper({ inputPath, outputPath, crops, aspectRatio, timeRange
       dynamicZoom: !!dynamicZoom,
       audioEnhance: !!audioEnhance,
       headlineText,
+      subtitlePath,
+      bgmTrack,
+      bgmVolume,
       resolution
     };
     
@@ -118,7 +121,7 @@ function runPythonClipper({ inputPath, outputPath, crops, aspectRatio, timeRange
 /**
  * Memotong video (clip) sesuai rentang waktu, opsional resize/crop vertical.
  */
-function clipVideo({ inputPath, outputPath, startSeconds, durationSeconds, resolution, crops, aspectRatio, timeRanges, heatmapOverlay, dynamicZoom, audioEnhance, headlineText, onProgress }) {
+function clipVideo({ inputPath, outputPath, startSeconds, durationSeconds, resolution, crops, aspectRatio, timeRanges, heatmapOverlay, dynamicZoom, audioEnhance, headlineText, subtitlePath, bgmTrack, bgmVolume, onProgress }) {
   const isSplit = aspectRatio && aspectRatio.endsWith('-split');
   const isVerticalOrSquare = aspectRatio && (aspectRatio === '9:16' || aspectRatio === '1:1' || isSplit);
   
@@ -134,6 +137,9 @@ function clipVideo({ inputPath, outputPath, startSeconds, durationSeconds, resol
       dynamicZoom: !!dynamicZoom,
       audioEnhance: !!audioEnhance,
       headlineText: headlineText || '',
+      subtitlePath: subtitlePath || '',
+      bgmTrack: bgmTrack || 'none',
+      bgmVolume: bgmVolume || 0.10,
       onProgress,
       resolution
     });
@@ -145,6 +151,11 @@ function clipVideo({ inputPath, outputPath, startSeconds, durationSeconds, resol
     .videoCodec('libx264')
     .audioCodec('aac')
     .outputOptions(['-preset veryfast', '-movflags +faststart']);
+
+  if (subtitlePath && fs.existsSync(subtitlePath)) {
+    const escapedPath = subtitlePath.replace(/\\/g, '/').replace(/:/g, '\\:');
+    command.videoFilters(`ass='${escapedPath}'`);
+  }
 
   if (audioEnhance) {
     command.audioFilters('afftdn', 'loudnorm');
@@ -324,6 +335,12 @@ function isValidMediaFile(filePath) {
       }
       const streams = metadata?.streams;
       if (!Array.isArray(streams) || streams.length === 0) {
+        resolve(false);
+        return;
+      }
+      const vCodec = streams.find(s => s.codec_type === 'video')?.codec_name;
+      if (vCodec === 'av1') {
+        // AV1 tidak didukung native di banyak player HTML5 browser → paksa unduh versi H.264
         resolve(false);
         return;
       }

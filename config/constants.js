@@ -38,13 +38,13 @@ const RESOLUTIONS = Object.freeze({
   P360: '360p',
 });
 
-// Mapping resolusi -> format selector yt-dlp
+// Mapping resolusi -> format selector yt-dlp (diutamakan H.264/avc1 agar 100% kompatibel di player browser HTML5)
 const RESOLUTION_FORMAT_MAP = Object.freeze({
-  [RESOLUTIONS.ORIGINAL]: 'bestvideo+bestaudio/best',
-  [RESOLUTIONS.P1080]: 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
-  [RESOLUTIONS.P720]: 'bestvideo[height<=720]+bestaudio/best[height<=720]',
-  [RESOLUTIONS.P480]: 'bestvideo[height<=480]+bestaudio/best[height<=480]',
-  [RESOLUTIONS.P360]: 'bestvideo[height<=360]+bestaudio/best[height<=360]',
+  [RESOLUTIONS.ORIGINAL]: 'bestvideo[height<=1080][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[vcodec^=avc]+bestaudio/best[ext=mp4]/best',
+  [RESOLUTIONS.P1080]: 'bestvideo[height<=1080][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=1080][ext=mp4]+bestaudio/best[height<=1080]',
+  [RESOLUTIONS.P720]: 'bestvideo[height<=720][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
+  [RESOLUTIONS.P480]: 'bestvideo[height<=480][vcodec^=avc]+bestaudio[ext=m4a]/bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
+  [RESOLUTIONS.P360]: 'bestvideo[height<=360][vcodec^=avc]+bestaudio[ext=m4a]/18/bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
 });
 
 const YOUTUBE_URL_REGEX =

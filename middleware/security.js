@@ -15,7 +15,8 @@ function applySecurity(app) {
           defaultSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
           scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net"],
-          imgSrc: ["'self'", 'data:', 'https:'], // thumbnail YouTube dari domain eksternal
+          imgSrc: ["'self'", 'data:', 'blob:', 'https:'], // thumbnail YouTube + preview subtitle (blob URL)
+          mediaSrc: ["'self'", 'blob:', 'data:'], // preview video dari blob URL
           connectSrc: ["'self'", "https://tfhub.dev", "https://*.tfhub.dev", "https://storage.googleapis.com"],
           fontSrc: ["'self'", "https://fonts.gstatic.com"],
         },

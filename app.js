@@ -44,8 +44,20 @@ app.set('views', path.join(__dirname, 'views'));
 
 // ===== Static Assets =====
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/downloads', express.static(config.folders.downloads));
-app.use('/output', express.static(config.folders.output));
+app.use('/downloads', express.static(config.folders.downloads, {
+  setHeaders: (res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.set('Accept-Ranges', 'bytes');
+  }
+}));
+app.use('/output', express.static(config.folders.output, {
+  setHeaders: (res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.set('Accept-Ranges', 'bytes');
+  }
+}));
 
 // ===== Frontend Route =====
 app.get('/', (req, res) => {

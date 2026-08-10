@@ -4,12 +4,64 @@
  * Controller/route TIDAK boleh memanggil spawn() langsung.
  */
 
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 const config = require('../config');
 const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
 const { ERROR_CODES, RESOLUTION_FORMAT_MAP, RESOLUTIONS } = require('../config/constants');
+
+/**
+ * Memastikan video selalu ber-codec H.264 (avc1) + AAC (m4a)
+ * agar 100% kompatibel di semua player HTML5 browser tanpa error format/MIME type.
+ */
+function ensureBrowserCompatibleMp4(filePath) {
+  if (!fs.existsSync(filePath)) return Promise.resolve(filePath);
+  const ffprobeBin = config.binaries.ffprobe || 'ffprobe';
+
+  return new Promise((resolve) => {
+    execFile(ffprobeBin, [
+      '-v', 'error',
+      '-show_entries', 'stream=codec_name,codec_type',
+      '-of', 'json',
+      filePath
+    ], (err, stdout) => {
+      if (err) return resolve(filePath);
+      try {
+        const streams = JSON.parse(stdout).streams || [];
+        const vCodec = streams.find(s => s.codec_type === 'video')?.codec_name;
+        const aCodec = streams.find(s => s.codec_type === 'audio')?.codec_name;
+
+        // Jika codec adalah AV1, VP9, atau audio Opus -> transcode ke standard H.264 + AAC
+        if (vCodec === 'av1' || vCodec === 'vp9' || aCodec === 'opus') {
+          logger.info('Mengonversi file video ke standard H.264 + AAC untuk player browser...', { filePath, vCodec, aCodec });
+          const tempRecode = filePath.replace('.mp4', '_recode.mp4');
+          const ffmpegBin = config.binaries.ffmpeg || 'ffmpeg';
+          execFile(ffmpegBin, [
+            '-y', '-i', filePath,
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '22',
+            '-c:a', 'aac', '-b:a', '128k',
+            '-movflags', '+faststart',
+            tempRecode
+          ], (ffErr) => {
+            if (!ffErr && fs.existsSync(tempRecode) && fs.statSync(tempRecode).size > 10240) {
+              try {
+                fs.unlinkSync(filePath);
+                fs.renameSync(tempRecode, filePath);
+              } catch (e) {}
+            }
+            resolve(filePath);
+          });
+        } else {
+          resolve(filePath);
+        }
+      } catch (e) {
+        resolve(filePath);
+      }
+    });
+  });
+}
 
 const YTDLP_BIN = config.binaries.ytdlp;
 const SPAWN_TIMEOUT_MS = config.binaries.ytdlpDownloadTimeoutMs || 30 * 60 * 1000; // Default 30 menit
@@ -214,19 +266,20 @@ async function downloadVideo(url, videoId, resolution, onProgress) {
     config.binaries.ytdlpDownloadTimeoutMs
   );
 
+  let finalPath = path.join(config.folders.downloads, `${videoId}_${resolution}.mp4`);
+
   // Cari file yang sebenarnya terdownload (yt-dlp bisa saja melakukan fallback ke 360p jika ffmpeg tidak terpasang)
   try {
-    const fs = require('fs');
     const files = fs.readdirSync(config.folders.downloads);
     const matched = files.find(f => f.startsWith(`${videoId}_`) && f.endsWith('.mp4'));
     if (matched) {
-      return path.join(config.folders.downloads, matched);
+      finalPath = path.join(config.folders.downloads, matched);
     }
   } catch (e) {
     logger.error('Gagal memindai folder downloads untuk mendeteksi file hasil download', { error: e.message });
   }
 
-  return path.join(config.folders.downloads, `${videoId}_${resolution}.mp4`);
+  return await ensureBrowserCompatibleMp4(finalPath);
 }
 
 /**
@@ -264,7 +317,7 @@ async function downloadVideoSection(url, outputPath, resolution, startSeconds, e
     config.binaries.ytdlpDownloadTimeoutMs
   );
 
-  return outputPath;
+  return await ensureBrowserCompatibleMp4(outputPath);
 }
 
 module.exports = { getVideoInfo, downloadVideo, downloadVideoSection, mapYtdlpError };

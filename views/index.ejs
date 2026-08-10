@@ -1,34 +1,44 @@
 <%- include('partials/header') %>
 
-
-  <div class="grain"></div>
-
+  <!-- ===== TOP NAV ===== -->
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark">[&nbsp;⏱&nbsp;]</span>
+      <span class="brand-mark">⏱</span>
       <span class="brand-name">Clipreel</span>
+      <span class="brand-pill">PRO STUDIO</span>
     </div>
     <div class="topbar-actions">
-      <span class="tag">yt-dlp + ffmpeg</span>
+      <button type="button" id="guideBtn" class="btn btn-sm btn-ghost" title="Buku Panduan & Cara Pemakaian">📖 Panduan</button>
+      <span class="tag"><span class="dot"></span><span class="tag-text">yt-dlp + ffmpeg</span></span>
       <button id="themeToggle" class="icon-btn" title="Ubah tema" aria-label="Ubah tema">◐</button>
     </div>
   </header>
 
   <main class="wrap">
 
-    <!-- ===== HERO / URL INPUT ===== -->
+    <!-- ===== GUIDED STEPS ===== -->
+    <nav class="steps" aria-label="Langkah pembuatan klip">
+      <span class="step active"><span class="step-num">01</span> Link</span>
+      <span class="step-line"></span>
+      <span class="step"><span class="step-num">02</span> Trim</span>
+      <span class="step-line"></span>
+      <span class="step"><span class="step-num">03</span> Export</span>
+    </nav>
+
+    <!-- ===== HERO / LINK INPUT ===== -->
     <section class="hero">
       <p class="eyebrow">TIMECODE 00:00:00 — 00:00:00</p>
-      <h1>Potong momen terbaik dari video YouTube mana pun.</h1>
-      <p class="lede">Tempel tautan, tandai in-point dan out-point, lalu ekspor. Tidak perlu mengunduh seluruh video.</p>
+      <h1>Ubuh video YouTube jadi <span class="grad">konten viral</span> dalam hitungan menit.</h1>
+      <p class="lede">Tempel tautan, tandai in-point dan out-point, tambah subtitle karaoke &amp; musik latar — ekspor langsung siap posting.</p>
 
-      <form id="urlForm" class="url-form" autocomplete="off">
+      <form id="urlForm" class="url-form" autocomplete="off" novalidate>
         <div id="dropzone" class="dropzone">
+          <span class="dz-hint">🔗</span>
           <input
             type="text"
             id="urlInput"
             name="url"
-            placeholder="https://youtube.com/watch?v=…  atau tempel/drop link di sini"
+            placeholder="https://youtube.com/watch?v=…  atau tempel / drop link di sini"
             required
           />
           <button type="submit" id="loadBtn" class="btn btn-primary">
@@ -37,137 +47,373 @@
         </div>
       </form>
       <p id="urlError" class="field-error" hidden></p>
+
+      <div class="hero-trust">
+        <span>✓ Tanpa unduh manual</span>
+        <span>✓ AI subtitle otomatis</span>
+        <span>✓ Preset TikTok · Reels · Shorts</span>
+      </div>
     </section>
 
-    <!-- ===== PREVIEW + TRIM PANEL ===== -->
-    <section id="previewSection" class="panel preview-panel" hidden>
-      <div class="preview-grid">
-        <div class="thumb-wrap" style="position: relative; background: #000; overflow: hidden; aspect-ratio: 16/9;">
-          <img id="thumbImg" src="" alt="Thumbnail video" style="width:100%; height:100%; object-fit:cover; display:block;" />
-          <video id="videoElement" crossorigin="anonymous" playsinline style="display:none; width:100%; height:100%; object-fit:contain; position:absolute; top:0; left:0;"></video>
+    <!-- ===== WORKBENCH (preview + inspector) ===== -->
+    <section id="previewSection" class="studio" hidden>
+
+      <!-- ── CANVAS (kiri) ─────────────────────────────── -->
+      <div class="canvas-panel" id="canvasPanel">
+        <div class="canvas-head">
+          <span class="canvas-title">🖥️ Preview</span>
+          <span id="aiStatus" class="ai-badge">AI OFFLINE</span>
+        </div>
+
+        <div class="thumb-wrap">
+          <img id="thumbImg" src="" alt="Thumbnail video" />
+          <video id="videoElement" playsinline controls preload="auto"
+                 style="display:none; width:100%; height:100%; object-fit:contain; position:absolute; top:0; left:0;"></video>
           <canvas id="trackerCanvas" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:2;"></canvas>
-          <div id="cropPreviewBox" class="crop-preview-box hidden" style="position:absolute; border:2px dashed var(--accent); box-shadow:0 0 10px rgba(94,234,212,0.4); pointer-events:auto; cursor:move; background:rgba(94,234,212,0.04); z-index:3;"></div>
+          <div id="cropPreviewBox" class="crop-preview-box hidden"></div>
           <span id="durationBadge" class="duration-badge">00:00:00</span>
         </div>
 
         <div class="meta">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <h2 id="videoTitle">—</h2>
-            <span id="aiStatus" class="tag" style="font-size:10px; margin-left:10px; border-color:var(--border);">AI OFFLINE</span>
-          </div>
+          <h2 id="videoTitle">—</h2>
           <p id="videoChannel" class="muted">—</p>
-
           <dl class="meta-grid">
             <div><dt>Durasi</dt><dd id="metaDuration">—</dd></div>
             <div><dt>Estimasi Ukuran</dt><dd id="metaSize">—</dd></div>
             <div><dt>Subtitle</dt><dd id="metaSubtitle">—</dd></div>
-            <div><dt>Resolusi Tersedia</dt><dd id="metaResolutions">—</dd></div>
+            <div><dt>Resolusi</dt><dd id="metaResolutions">—</dd></div>
           </dl>
         </div>
-      </div>
 
-      <!-- Signature element: timecode ruler menampilkan rentang clip terpilih -->
-      <div class="ruler-block">
-        <div class="ruler" id="ruler" style="cursor:pointer;">
-          <div class="ruler-ticks" id="rulerTicks"></div>
-          <div class="ruler-selection" id="rulerSelection"></div>
-          <div id="timelinePlayhead" style="position:absolute; top:0; bottom:0; width:2px; background:var(--accent); pointer-events:none; display:none;"></div>
+        <!-- Timecode ruler -->
+        <div class="ruler-block">
+          <div class="ruler" id="ruler" style="cursor:pointer;">
+            <div class="ruler-ticks" id="rulerTicks"></div>
+            <div class="ruler-selection" id="rulerSelection"></div>
+            <div id="timelinePlayhead" style="position:absolute; top:0; bottom:0; width:2px; background:var(--accent); pointer-events:none; display:none;"></div>
+          </div>
+          <div id="timelineHeatmap" class="timeline-heatmap hidden"></div>
         </div>
-        <div id="timelineHeatmap" class="timeline-heatmap hidden" style="height:8px; background:rgba(255,255,255,0.02); border-radius:4px; position:relative; margin-top:6px; overflow:hidden; border:1px solid var(--border);"></div>
+
+        <!-- Preset platform & Durasi Kustom -->
+        <div class="presets-row">
+          <div class="presets-buttons">
+            <span class="presets-label">🎯 Preset:</span>
+            <button type="button" class="platform-preset-btn active" data-platform="tiktok" data-duration="30">📱 TikTok · 30s</button>
+            <button type="button" class="platform-preset-btn" data-platform="shorts" data-duration="55">▶️ Shorts · 55s</button>
+            <button type="button" class="platform-preset-btn" data-platform="reels" data-duration="60">📸 Reels · 60s</button>
+            <button type="button" class="platform-preset-btn" data-platform="twitter" data-duration="90">🐦 X · 90s</button>
+          </div>
+          <div class="custom-duration-wrap">
+            <span class="custom-dur-label">⏱ Target Durasi:</span>
+            <div class="dur-input-group">
+              <input type="number" id="customDurationInput" min="5" max="600" value="30" step="1" title="Atur durasi potong bebas / kustom (detik)" />
+              <span class="dur-unit">detik</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Highlights + Queue -->
+        <div id="highlightsContainer" class="highlights-box hidden">
+          <div class="highlights-head">
+            <span class="highlights-title">🔥 Rekomendasi Momen</span>
+            <div class="highlights-actions">
+              <button id="exportQueueBtn" class="btn btn-sm" style="display:none;" title="Ekspor semua klip yang disimpan ke antrian">
+                📦 Ekspor Antrian (<span id="exportQueueCount">0</span>)
+              </button>
+              <button id="exportSelectedBtn" class="btn btn-sm" style="display:none;">
+                ✂️ Ekspor Terpilih (<span id="exportSelectedCount">0</span>)
+              </button>
+            </div>
+          </div>
+
+          <div id="gradeLegend" class="grade-legend">
+            <span class="legend-label">GRADE:</span>
+            <span class="grade-chip" data-g="S">S · VIRAL TINGGI</span>
+            <span class="grade-chip" data-g="A">A · Sangat Potensial</span>
+            <span class="grade-chip" data-g="B">B · Berpotensi</span>
+            <span class="grade-chip" data-g="C">C · Layak Konten</span>
+            <span class="grade-chip" data-g="D">D · Informatif</span>
+          </div>
+
+          <div id="highlightsList" class="highlights-list"></div>
+
+          <div id="queuePanel" class="queue-panel hidden">
+            <div class="queue-head">
+              <span class="queue-title">🗂️ Antrian Klip (Draft)</span>
+              <span class="queue-hint">Disimpan sementara di browser — klik “Simpan ke Antrian” pada segmen</span>
+            </div>
+            <div id="queueList" class="queue-list"></div>
+          </div>
+        </div>
       </div>
 
-      <div id="highlightsContainer" class="hidden" style="margin-top:15px; padding:16px; background:var(--bg-alt); border-radius:10px; border:1px solid var(--border);">
-        <!-- Header row -->
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-          <span class="field-label" style="color:var(--accent); font-size:11px; font-weight:600;">🔥 Rekomendasi Momen (Suggested Highlights)</span>
-          <button id="exportSelectedBtn" class="btn btn-accent" style="display:none; padding:7px 16px; font-size:12px; font-weight:700;">
-            ✂️ Ekspor Terpilih (<span id="exportSelectedCount">0</span>)
+      <!-- ───────── INSPECTOR (kanan) ───────────────────── -->
+      <div class="inspector-panel">
+        <form id="clipForm" class="clip-form" autocomplete="off" novalidate>
+
+          <!-- 01 · Range & Output -->
+          <div class="inspector-card">
+            <div class="card-title">
+              <span class="step-dot">1</span> Rentang &amp; Output
+            </div>
+            <div class="field-row">
+              <label>
+                <span class="field-label">IN — mulai</span>
+                <input type="text" id="startInput" name="start" placeholder="00:00:00" value="00:00:00" required />
+              </label>
+              <label>
+                <span class="field-label">OUT — selesai</span>
+                <input type="text" id="endInput" name="end" placeholder="00:00:30" value="00:00:30" required />
+              </label>
+            </div>
+            <div class="field-row two">
+              <label>
+                <span class="field-label">Resolusi</span>
+                <select id="resolutionSelect" name="resolution">
+                  <option value="original" selected>Original (Kualitas Asli)</option>
+                  <option value="1080p">1080p (Full HD)</option>
+                  <option value="720p">720p (HD)</option>
+                  <option value="480p">480p (Hemat)</option>
+                  <option value="360p">360p (Ringan)</option>
+                </select>
+              </label>
+              <label>
+                <span class="field-label">Rasio Layar</span>
+                <select id="aspectRatioSelect" name="aspectRatio">
+                  <option value="9:16" selected>9:16 Vertical (Shorts/TikTok/Reels)</option>
+                  <option value="9:16-split">9:16 + Split Gameplay</option>
+                  <option value="1:1">1:1 Square (Instagram)</option>
+                  <option value="original">Landscape (Original 16:9)</option>
+                </select>
+              </label>
+            </div>
+            <div class="field-row one">
+              <label>
+                <span class="field-label">Headline Banner (opsional)</span>
+                <input type="text" id="headlineInput" name="headlineText" placeholder="🔥 RAHASIA SUKSES — teks banner atas" />
+              </label>
+            </div>
+          </div>
+
+          <!-- 02 · Efek -->
+          <div class="inspector-card">
+            <div class="card-title">
+              <span class="dot">2</span> Efek &amp; Pintasan
+            </div>
+            <div class="toggle-grid">
+              <label class="toggle-card">
+                <input type="checkbox" id="autoSubtitleToggle" name="autoSubtitle" checked />
+                <span class="switch"></span>
+                <span class="toggle-text">💬 Auto Subtitle<span class="toggle-sub">Gaya Shorts</span></span>
+              </label>
+              <label class="toggle-card">
+                <input type="checkbox" id="silenceRemoverToggle" name="silenceRemover" checked />
+                <span class="switch"></span>
+                <span class="toggle-text">⚡ Silence Remover<span class="toggle-sub">Potong jeda (>0.35s)</span></span>
+              </label>
+              <label class="toggle-card">
+                <input type="checkbox" id="heatmapToggle" name="heatmapOverlay" />
+                <span class="switch"></span>
+                <span class="toggle-text">🫀 Heatmap Wajah<span class="toggle-sub">Burn tracking</span></span>
+              </label>
+              <label class="toggle-card">
+                <input type="checkbox" id="dynamicZoomToggle" name="dynamicZoom" />
+                <span class="switch"></span>
+                <span class="toggle-text">🎥 Dynamic Zoom<span class="toggle-sub">Jump-cut</span></span>
+              </label>
+              <label class="toggle-card">
+                <input type="checkbox" id="audioEnhanceToggle" name="audioEnhance" checked />
+                <span class="switch"></span>
+                <span class="toggle-text">🔊 Jernihkan Audio<span class="toggle-sub">Denoise</span></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 03 · Subtitle -->
+          <div id="subtitleOptionsRow" class="inspector-card accent-card">
+            <div class="card-title">
+              <span class="dot">3</span> 🎨 Subtitle &amp; Typografi
+            </div>
+            <div class="field-row">
+              <label class="wide">
+                <span class="field-label">Template</span>
+                <select id="subtitleStyleSelect" name="subtitleStyle">
+                  <option value="quick-brown-inv" selected>🦊 Quick Brown INVERSE (Kuning Dasar, Putih Berjalan — Default)</option>
+                  <option value="quick-brown">🦊 The Quick Brown Fox (Karaoke Kuning CapCut)</option>
+                  <option value="mrbeast-white">🟥 MrBeast Pop (Kata-per-kata, Putih)</option>
+                  <option value="capcut-karaoke">🎵 CapCut Karaoke (Kuning Aktif)</option>
+                  <option value="capcut-box">📦 CapCut Box (Kotak Hitam)</option>
+                  <option value="capcut-neon">💡 CapCut Neon Cyan</option>
+                  <option value="capcut-rainbow">🌈 CapCut Rainbow (Pelangi)</option>
+                  <option value="capcut-ugc">🫶 CapCut UGC (Lowercase Aesthetic)</option>
+                  <option value="capcut-glow">✨ CapCut Glow (Cyan Shadow)</option>
+                  <option value="word-pop">🎤 Word Pop Karaoke (Kata Putih/Kuning)</option>
+                  <option value="archivo-black">⬛ Archivo Black (Modern Bold)</option>
+                  <option value="bebas-amber">🟨 Bebas Amber (Display Cap)</option>
+                  <option value="neon-pink">💗 Pink Neon Glow</option>
+                  <option value="glitch-green">🟢 Hacker Mono Green</option>
+                  <option value="gold-bold">👑 Gold Bold Premium</option>
+                  <option value="purple-holo">🔮 Purple Holo</option>
+                  <option value="minimal-white">🤍 Minimal White Clean</option>
+                  <option value="shadow-pop">🗯️ Shadow Pop (Soft Drop)</option>
+                  <option value="yellow-viral">🔥 Kuning Viral (Alex Hormozi)</option>
+                  <option value="neon-green">⚡ Hijau Neon (MrBeast Style)</option>
+                  <option value="cyan-blue">🌊 Biru Cyan Cyber</option>
+                  <option value="impact-red">💥 Merah Kontras (Hook)</option>
+                  <option value="golden-luxury">👑 Gold Luxury (Finansial)</option>
+                  <option value="clean-white">✨ Putih Minimalis Drop-Shadow</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label>
+                <span class="field-label">Ukuran Font</span>
+                <select id="subtitleSizeSelect" name="subtitleSize">
+                  <option value="tiny">Kecil (22pt)</option>
+                  <option value="small">Standar (30pt)</option>
+                  <option value="medium">Sedang (40pt)</option>
+                  <option value="large" selected>Besar (52pt — Rekomendasi)</option>
+                  <option value="xlarge">Ekstra Besar (68pt — Punchy)</option>
+                  <option value="huge">Raksasa (86pt — Big Hook)</option>
+                  <option value="xxlarge">Monster (108pt — MrBeast Style)</option>
+                  <option value="colossal">Kolosal (135pt — Giant Screen Fill)</option>
+                </select>
+              </label>
+              <label>
+                <span class="field-label">Font</span>
+                <select id="subtitleFontSelect" name="subtitleFont">
+                  <option value="auto" selected>Auto (dari Template)</option>
+                  <option value="Anton">Anton (MrBeast Display)</option>
+                  <option value="Bebas Neue">Bebas Neue (Caps Bold)</option>
+                  <option value="Archivo Black">Archivo Black (Heavy)</option>
+                  <option value="Poppins">Poppins (Modern Clean)</option>
+                  <option value="Roboto">Roboto (Netral)</option>
+                  <option value="DejaVu Sans">DejaVu Sans (Universal)</option>
+                  <option value="JetBrainsMono Nerd Font">JetBrains Mono (Tech)</option>
+                  <option value="Noto Sans">Noto Sans (Multibahasa)</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label>
+                <span class="field-label">Posisi</span>
+                <select id="subtitlePosSelect" name="subtitlePosition">
+                  <option value="bottom" selected>Bawah Layar (Standar Shorts)</option>
+                  <option value="middle">Tengah Layar (Fokus POV)</option>
+                  <option value="top">Atas Layar</option>
+                </select>
+              </label>
+              <label>
+                <span class="field-label">Kapitalisasi</span>
+                <select id="subtitleCaseSelect" name="subtitleCase">
+                  <option value="uppercase" selected>SEMUA HURUF BESAR (Viral)</option>
+                  <option value="lowercase">huruf kecil semua (Aesthetic)</option>
+                  <option value="titlecase">Kapital Tiap Kata</option>
+                  <option value="normal">Normal (Sentence Case)</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label>
+                <span class="field-label">Bahasa Subtitle</span>
+                <select id="subtitleLangSelect" name="subtitleLanguage">
+                  <option value="auto" selected>Otomatis (Deteksi AI)</option>
+                  <option value="id">🇮🇩 Indonesia</option>
+                  <option value="en">🇬🇧 English</option>
+                  <option value="ar">🇸🇦 العربية</option>
+                  <option value="es">🇪🇸 Español</option>
+                  <option value="ja">🇯🇵 日本語</option>
+                  <option value="ko">🇰🇷 한국어</option>
+                  <option value="zh">🇨🇳 中文</option>
+                  <option value="hi">🇮🇳 हिन्दी</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="sub-preview-area">
+              <div class="sub-preview-head">
+                <span class="sub-preview-title">🔍 Preview Subtitle</span>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                  <button type="button" id="previewSubtitleBtn" class="btn btn-sm">🎬 Contoh PNG</button>
+                  <button type="button" id="previewRangeVideoBtn" class="btn btn-sm btn-primary" title="Preview video 9:16 nyata dengan subtitle berjalan">📱 Video 9:16 (Rentang)</button>
+                </div>
+              </div>
+              <div id="subtitlePreviewWrap" class="sub-preview-wrap hidden">
+                <div class="sub-preview-frame">
+                  <img id="subtitlePreviewImg" alt="Preview subtitle" />
+                </div>
+                <div id="previewBadge" class="sub-preview-badge"></div>
+              </div>
+              <div class="sub-preview-hint">Frame contoh 9:16 — sama persis dengan hasil ekspor.</div>
+            </div>
+          </div>
+
+          <!-- 04 · BGM -->
+          <div id="bgmOptionsRow" class="inspector-card">
+            <div class="card-title">
+              <span class="dot">4</span> 🎵 Musik Latar &amp; Ducking
+            </div>
+            <div class="field-row two">
+              <label>
+                <span class="field-label">Pilih Musik</span>
+                <select id="bgmTrackSelect" name="bgmTrack">
+                  <option value="none" selected>Tanpa BGM (Audio Asli Saja)</option>
+                  <option value="lofi">🎧 Lo-Fi Chill Ambient (Podcast)</option>
+                  <option value="upbeat">⚡ Upbeat Viral Pop (Shorts/Reels)</option>
+                  <option value="cinematic">🎬 Cinematic Suspense (Story)</option>
+                </select>
+              </label>
+              <label>
+                <span class="field-label">Volume BGM (Ducking Otomatis)</span>
+                <select id="bgmVolumeSelect" name="bgmVolume">
+                  <option value="0.10">Halus (10% — Rekomendasi)</option>
+                  <option value="0.18">Sedang (18%)</option>
+                  <option value="0.25">Keras (25%)</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <!-- 05 · Metadata AI -->
+          <div id="contentMetadataPanel" class="inspector-card">
+            <div class="meta-actions">
+              <div class="card-title" style="margin-bottom:0;">
+                <span class="dot">5</span> 📝 Metadata Konten AI
+              </div>
+              <div class="meta-btn-group">
+                <button type="button" id="saveToQueueBtn" class="btn btn-sm">🗂️ Simpan ke Antrian</button>
+                <button type="button" id="generateMetaBtn" class="btn btn-ghost btn-sm">⚡ Generate Ulang</button>
+              </div>
+            </div>
+            <div class="meta-fields">
+              <label>
+                <span class="field-label">Judul (Click-Worthy)</span>
+                <input type="text" id="metaClipTitle" name="clipTitle" placeholder="Judul menarik untuk video..." />
+              </label>
+              <label>
+                <span class="field-label">Hashtags &amp; Tags</span>
+                <input type="text" id="metaClipTags" name="clipTags" placeholder="#Shorts #TikTokViral #Edukasi..." />
+              </label>
+              <label>
+                <span class="field-label">Deskripsi / Caption (Siap Copas)</span>
+                <textarea id="metaClipDesc" name="clipDescription" rows="3" placeholder="Deskripsi lengkap dan call-to-action untuk postingan..."></textarea>
+              </label>
+            </div>
+          </div>
+
+          <p id="clipError" class="field-error" hidden></p>
+          <button type="submit" id="clipBtn" class="btn btn-accent">
+            <span class="btn-label">🔥 Deteksi Highlights Otomatis</span>
           </button>
-        </div>
-
-        <!-- Viral Grade Legend -->
-        <div id="gradeLegend" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; padding:10px 12px; background:var(--bg-raised); border-radius:8px; border:1px solid var(--border);">
-          <span style="font-size:10px; color:var(--muted); font-weight:600; margin-right:4px; align-self:center;">GRADE:</span>
-          <span style="font-size:10px; background:#ef444422; color:#ef4444; border:1px solid #ef444455; border-radius:5px; padding:2px 8px; font-weight:700;">S · VIRAL TINGGI</span>
-          <span style="font-size:10px; background:#f9731622; color:#f97316; border:1px solid #f9731655; border-radius:5px; padding:2px 8px; font-weight:700;">A · Sangat Potensial</span>
-          <span style="font-size:10px; background:#eab30822; color:#eab308; border:1px solid #eab30855; border-radius:5px; padding:2px 8px; font-weight:700;">B · Berpotensi</span>
-          <span style="font-size:10px; background:#22c55e22; color:#22c55e; border:1px solid #22c55e55; border-radius:5px; padding:2px 8px; font-weight:700;">C · Layak Konten</span>
-          <span style="font-size:10px; background:#6b728022; color:#6b7280; border:1px solid #6b728055; border-radius:5px; padding:2px 8px; font-weight:700;">D · Informatif</span>
-        </div>
-
-        <div id="highlightsList" style="display:flex; flex-direction:column; gap:6px;"></div>
+        </form>
       </div>
-
-
-      <form id="clipForm" class="clip-form">
-        <div class="field-row">
-          <label>
-            <span class="field-label">IN — start</span>
-            <input type="text" id="startInput" name="start" placeholder="00:00:00" value="00:00:00" required />
-          </label>
-          <label>
-            <span class="field-label">OUT — end</span>
-            <input type="text" id="endInput" name="end" placeholder="00:01:00" required />
-          </label>
-          <label>
-            <span class="field-label">Resolusi</span>
-            <select id="resolutionSelect" name="resolution">
-              <option value="original" selected>Original (Kualitas Asli Video)</option>
-              <option value="1080p">1080p (Full HD)</option>
-              <option value="720p">720p (HD)</option>
-              <option value="480p">480p (Hemat Bandwidth)</option>
-              <option value="360p">360p (Hemat Penyimpanan)</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="field-row" style="margin-top: 15px;">
-          <label>
-            <span class="field-label">Aspect Ratio Output</span>
-            <select id="aspectRatioSelect" name="aspectRatio">
-              <option value="original" selected>Landscape (Original)</option>
-              <option value="9:16">9:16 Vertical (Shorts/TikTok)</option>
-              <option value="9:16-split">9:16 Vertical + Split Gameplay</option>
-              <option value="1:1">1:1 Square</option>
-            </select>
-          </label>
-          <label style="grid-column: span 2;">
-            <span class="field-label">Headline Text Overlay</span>
-            <input type="text" id="headlineInput" name="headlineText" placeholder="Teks banner atas, misal: INTELLECT & ENERGY" style="font-family: inherit; font-size: 14px;" />
-          </label>
-        </div>
-
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:16px;">
-          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-            <input type="checkbox" id="heatmapToggle" name="heatmapOverlay" style="width:16px; height:16px; accent-color:var(--accent);" />
-            <span style="font-size:13px; color:var(--text);">Burn Heatmap Wajah</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-            <input type="checkbox" id="dynamicZoomToggle" name="dynamicZoom" style="width:16px; height:16px; accent-color:var(--accent);" />
-            <span style="font-size:13px; color:var(--text);">Dynamic Zoom (Jump-Cut)</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-            <input type="checkbox" id="audioEnhanceToggle" name="audioEnhance" style="width:16px; height:16px; accent-color:var(--accent);" checked />
-            <span style="font-size:13px; color:var(--text);">Denoise & Penjernih Suara</span>
-          </label>
-        </div>
-
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
-          <div></div>
-          <button type="button" id="detectHighlightsBtn" class="btn btn-ghost" style="padding: 8px 16px; font-size:12px;">
-            <span>🔥 Deteksi Highlights Otomatis</span>
-          </button>
-        </div>
-
-        <p id="clipError" class="field-error" hidden></p>
-        <button type="submit" id="clipBtn" class="btn btn-accent">
-          <span class="btn-label">Potong &amp; Ekspor Clip</span>
-        </button>
-      </form>
     </section>
 
-
-    <!-- ===== PROGRESS PANEL ===== -->
+    <!-- ===== PROGRESS ===== -->
     <section id="progressSection" class="panel progress-panel" hidden>
       <div class="progress-head">
         <span id="progressStage" class="progress-stage">Menunggu antrian…</span>
@@ -179,24 +425,138 @@
       <div class="vu-meter" id="vuMeter" aria-hidden="true"></div>
     </section>
 
-    <!-- ===== RESULT PANEL ===== -->
+    <!-- ===== RESULT ===== -->
     <section id="resultSection" class="panel result-panel" hidden>
       <div class="result-icon">✓</div>
-      <div>
+      <div class="result-info">
         <h3>Clip siap diunduh</h3>
         <p id="resultFilename" class="muted mono">—</p>
       </div>
       <div class="result-actions">
-        <a id="downloadBtn" class="btn btn-primary" href="#" download>Download</a>
-        <button id="deleteBtn" class="btn btn-ghost">Hapus File</button>
+        <a id="downloadBtn" class="btn btn-primary" href="#" download>⬇ Download MP4</a>
+        <button id="publishSocialBtn" class="btn btn-accent publish-btn" style="margin-top:0;">🚀 Posting ke Sosmed</button>
+        <button id="deleteBtn" class="btn btn-ghost">🗑 Hapus File</button>
       </div>
     </section>
 
   </main>
 
   <footer class="page-footer">
-    <p>Clipreel — dibuat untuk memotong video secara efisien. File otomatis dihapus setelah 30 menit.</p>
+    <p>Clipreel Studio — file otomatis dihapus setelah 30 menit. <span class="heart">♥</span></p>
   </footer>
+
+  <!-- ===== 9:16 VIDEO PREVIEW MODAL ===== -->
+  <div id="videoPreviewModal" class="modal-backdrop hidden" aria-hidden="true" role="dialog">
+    <div class="modal-dialog phone-modal">
+      <div class="phone-frame">
+        <div class="phone-speaker"></div>
+        <div class="phone-screen">
+          <video id="previewVideo916" playsinline controls loop preload="auto"></video>
+          <div id="previewVideoLoading" class="preview-video-loading hidden">
+            <div class="spinner"></div>
+            <p id="previewVideoLoadingText">Merender preview 9:16 + Subtitle AI...</p>
+          </div>
+          <div class="phone-overlay-info">
+            <span id="modalGradeBadge" class="modal-grade-chip">GRADE S</span>
+            <span id="modalTimeRange" class="modal-time-chip">00:00 — 00:30</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-meta-card">
+        <div class="modal-header">
+          <div>
+            <h4 id="modalPreviewTitle">📱 Preview 9:16 (Shorts / Reels)</h4>
+            <p id="modalPreviewSub">Subtitle: <strong id="modalSubStyleName">—</strong></p>
+          </div>
+          <button type="button" id="closePreviewModalBtn" class="icon-btn modal-close" title="Tutup">✕</button>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="applyPreviewToFormBtn" class="btn btn-primary btn-sm">
+            ✂️ Gunakan Rentang Ini
+          </button>
+          <button type="button" id="queueFromPreviewBtn" class="btn btn-sm">
+            🗂️ Simpan ke Antrian
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== USER GUIDE MODAL (TATA CARA PEMAKAIAN) ===== -->
+  <div id="guideModal" class="modal-backdrop hidden" aria-hidden="true" role="dialog">
+    <div class="modal-dialog guide-modal">
+      <div class="guide-card">
+        <div class="modal-header">
+          <div class="guide-header-title">
+            <span class="guide-badge">TUTORIAL RESMI</span>
+            <h3>📖 Panduan Lengkap Penggunaan Clipreel Studio</h3>
+            <p>Panduan langkah-demi-langkah mengubah video YouTube menjadi klip Shorts/TikTok siap viral.</p>
+          </div>
+          <button type="button" id="closeGuideModalBtn" class="icon-btn modal-close" title="Tutup">✕</button>
+        </div>
+
+        <div class="guide-steps-grid">
+          <!-- Step 1 -->
+          <div class="guide-step-card">
+            <div class="gstep-num">01</div>
+            <div class="gstep-content">
+              <h4>Tempel Tautan Video</h4>
+              <p>Copy link video YouTube (podcast, wawancara, gaming, motivasi) lalu tempel ke kolom input dan klik <strong>"Muat Video"</strong>.</p>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="guide-step-card">
+            <div class="gstep-num">02</div>
+            <div class="gstep-content">
+              <h4>Pilih Rentang &amp; Target Durasi</h4>
+              <p>Gunakan preset platform (TikTok 30s, Shorts 55s, Reels 60s) atau ketik <strong>Target Durasi Bebas</strong> di kolom detik. Seret penggaris timeline atau klik <strong>"🔥 Deteksi Highlights Otomatis"</strong> untuk menemukan segmen terbaik via AI.</p>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="guide-step-card">
+            <div class="gstep-num">03</div>
+            <div class="gstep-content">
+              <h4>Preview Video 9:16 Vertikal</h4>
+              <p>Klik tombol <strong>📱 9:16</strong> di kartu highlight atau <strong>"📱 Video 9:16 (Rentang)"</strong> untuk memutar preview video vertikal dengan subtitle bergerak secara instan sebelum diekspor.</p>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="guide-step-card">
+            <div class="gstep-num">04</div>
+            <div class="gstep-content">
+              <h4>Kustomisasi Subtitle &amp; Audio</h4>
+              <p>Pilih dari <strong>24 Style Subtitle</strong> (Karaoke Kuning, MrBeast Pop, CapCut Neon, dll.). Aktifkan <strong>⚡ Silence Remover</strong> agar jeda diam otomatis terpotong, lalu tambahkan Musik Latar (BGM) jika diinginkan.</p>
+            </div>
+          </div>
+
+          <!-- Step 5 -->
+          <div class="guide-step-card">
+            <div class="gstep-num">05</div>
+            <div class="gstep-content">
+              <h4>Ekspor &amp; Posting</h4>
+              <p>Klik <strong>"✂️ Potong &amp; Ekspor Clip"</strong> untuk ekspor langsung, atau <strong>"🗂️ Simpan ke Antrian"</strong> untuk mengekspor banyak klip sekaligus secara batch!</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-pro-tips">
+          <span class="tip-icon">💡</span>
+          <div class="tip-text">
+            <strong>Tips Pro:</strong> Gunakan Rasio <strong>9:16 Vertical</strong> + Subtitle <strong>The Quick Brown Fox Karaoke</strong> + <strong>Silence Remover</strong> untuk memaksimalkan retensi penonton di TikTok, YouTube Shorts, dan Instagram Reels.
+          </div>
+        </div>
+
+        <div class="guide-footer">
+          <button type="button" id="startUsingBtn" class="btn btn-primary">
+            🚀 Mengerti &amp; Mulai Mengedit
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 

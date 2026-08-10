@@ -12,6 +12,22 @@ def check_drawtext_support(ffmpeg_path):
     except Exception:
         return False
 
+def get_system_font_path():
+    candidates = [
+        "/usr/share/fonts/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/system/fonts/Roboto-Regular.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf"
+    ]
+    for font in candidates:
+        if os.path.exists(font):
+            return font
+    return None
+
 def get_video_specs(ffprobe_path, filepath):
     try:
         cmd = [
@@ -40,6 +56,23 @@ def get_video_specs(ffprobe_path, filepath):
         sys.stderr.write(f"Error in get_video_specs: {str(e)}\n")
         return 0, 0, 0.0, 30.0
 
+def parse_aspect_ratio_val(aspect_ratio, W, H):
+    if aspect_ratio == 'original' or not aspect_ratio:
+        return W / H
+    if ':' in str(aspect_ratio):
+        try:
+            parts = str(aspect_ratio).replace('custom:', '').split(':')
+            num, den = float(parts[0]), float(parts[1])
+            if den > 0:
+                return num / den
+        except Exception:
+            pass
+    if aspect_ratio == '9:16-split' or aspect_ratio == '9:16':
+        return 9.0 / 16.0
+    if aspect_ratio == '1:1':
+        return 1.0
+    return W / H
+
 def get_crop_center(t, crops, W, H):
     if not crops:
         return W // 2, H // 2, None
@@ -61,9 +94,8 @@ def get_crop_center(t, crops, W, H):
         c0, c1 = crops_sorted[i], crops_sorted[i+1]
         t0, t1 = c0['time'], c1['time']
         if t0 <= t <= t1:
-            raw_alpha = (t - t0) / (t1 - t0) if t1 > t0 else 0.0
-            # Smoothstep easing (3*a^2 - 2*a^3) untuk pergerakan kamera yang lebih mulus dan tidak patah
-            alpha = raw_alpha * raw_alpha * (3 - 2 * raw_alpha)
+            alpha = (t - t0) / (t1 - t0) if t1 > t0 else 0.0
+            # Linear lerp presisi tinggi — kamera mengikuti gerakan pembicara secara responsif tanpa delay
             cx = c0['cx'] + alpha * (c1['cx'] - c0['cx'])
             cy = c0['cy'] + alpha * (c1['cy'] - c0['cy'])
             
@@ -208,7 +240,7 @@ def main():
             t_curr = c['time']
             sum_cx, sum_cy, count = 0.0, 0.0, 0
             for c_other in crops_sorted:
-                if abs(c_other['time'] - t_curr) <= 0.8: # 0.8s radius (1.6s window)
+                if abs(c_other['time'] - t_curr) <= 0.15: # 0.15s radius (0.3s window presisi & cepat)
                     cx_val = c_other.get('cx')
                     cy_val = c_other.get('cy')
                     if cx_val is not None and cy_val is not None:
@@ -231,6 +263,9 @@ def main():
     dynamic_zoom = cfg.get('dynamicZoom', False)
     audio_enhance = cfg.get('audioEnhance', False)
     headline_text = cfg.get('headlineText', '')
+    subtitle_path = cfg.get('subtitlePath', '')
+    bgm_track = cfg.get('bgmTrack', 'none')
+    bgm_volume = float(cfg.get('bgmVolume', 0.10))
     resolution = cfg.get('resolution')
     
     W, H, duration, fps = get_video_specs(ffprobe_path, input_path)
@@ -249,58 +284,33 @@ def main():
     }
     target_height = resolution_height_map.get(resolution)
     
+    target_ratio = parse_aspect_ratio_val(aspect_ratio, W, H)
+    
     # 1. Compute output dimensions W_out, H_out
     if target_height:
         H_out = target_height
-        if aspect_ratio == 'original':
-            W_out = int(target_height * (W / H))
-        elif aspect_ratio == '9:16' or is_split:
-            W_out = int(target_height * (9/16))
-        elif aspect_ratio == '1:1':
-            W_out = target_height
-        else:
-            W_out = int(target_height * (W / H))
+        W_out = int(target_height * target_ratio)
         W_out = (W_out // 2) * 2
         H_out = (H_out // 2) * 2
     else:
-        if is_split:
-            target_ratio_out = 9/16
-            if W / H > target_ratio_out:
-                H_out = H
-                W_out = int(H * target_ratio_out)
-            else:
-                W_out = W
-                H_out = int(W / target_ratio_out)
+        if W / H > target_ratio:
+            H_out = H
+            W_out = int(H * target_ratio)
         else:
-            if aspect_ratio == 'original':
-                target_ratio = W / H
-            else:
-                target_ratio = 9/16 if aspect_ratio == '9:16' else 1.0
-                
-            if W / H > target_ratio:
-                H_out = H
-                W_out = int(H * target_ratio)
-            else:
-                W_out = W
-                H_out = int(W / target_ratio)
+            W_out = W
+            H_out = int(W / target_ratio)
         W_out = (W_out // 2) * 2
         H_out = (H_out // 2) * 2
 
     # 2. Compute native crop box size W_crop, H_crop
-    if is_split:
-        target_ratio = 9/8  # Speaker takes top half (aspect ratio 9/8 i.e. 720x640)
-    else:
-        if aspect_ratio == 'original':
-            target_ratio = W / H
-        else:
-            target_ratio = 9/16 if aspect_ratio == '9:16' else 1.0
+    crop_ratio = (9/8) if is_split else target_ratio
             
-    if W / H > target_ratio:
+    if W / H > crop_ratio:
         H_crop = H
-        W_crop = int(H * target_ratio)
+        W_crop = int(H * crop_ratio)
     else:
         W_crop = W
-        H_crop = int(W / target_ratio)
+        H_crop = int(W / crop_ratio)
     W_crop = (W_crop // 2) * 2
     H_crop = (H_crop // 2) * 2
         
@@ -335,34 +345,60 @@ def main():
                 '-ss', '10', '-t', str(dur),
             ]
             
-        if audio_enhance:
+        bgm_file_map = {
+            'lofi': 'lofi-ambient.mp3',
+            'upbeat': 'upbeat-viral.mp3',
+            'cinematic': 'cinematic-suspense.mp3'
+        }
+        selected_bgm = bgm_file_map.get(bgm_track)
+        bgm_full_path = os.path.join(os.path.dirname(__file__), '..', 'public', 'bgm', selected_bgm) if selected_bgm else None
+
+        if bgm_full_path and os.path.exists(bgm_full_path):
+            cmd_out += ['-stream_loop', '-1', '-i', bgm_full_path]
+            filter_chain = f"[1:a]asetpts=PTS-STARTPTS[a1];[2:a]volume={bgm_volume}[a2];[a1][a2]amix=inputs=2:duration=first[aout]"
+            if audio_enhance:
+                filter_chain = f"[1:a]asetpts=PTS-STARTPTS,afftdn,loudnorm[a1];[2:a]volume={bgm_volume}[a2];[a1][a2]amix=inputs=2:duration=first[aout]"
             cmd_out += [
-                '-map', '0:v', '-map', '1:a?',
-                '-af', 'asetpts=PTS-STARTPTS,afftdn,loudnorm',
+                '-map', '0:v', '-map', '[aout]',
+                '-c:a', 'aac', '-b:a', '192k',
+                '-filter_complex', filter_chain,
                 '-shortest'
             ]
         else:
-            cmd_out += [
-                '-map', '0:v', '-map', '1:a?',
-                '-c:a', 'aac', '-b:a', '192k',
-                '-af', 'asetpts=PTS-STARTPTS',
-                '-shortest'
-            ]
+            if audio_enhance:
+                cmd_out += [
+                    '-map', '0:v', '-map', '1:a?',
+                    '-af', 'asetpts=PTS-STARTPTS,afftdn,loudnorm',
+                    '-shortest'
+                ]
+            else:
+                cmd_out += [
+                    '-map', '0:v', '-map', '1:a?',
+                    '-c:a', 'aac', '-b:a', '192k',
+                    '-af', 'asetpts=PTS-STARTPTS',
+                    '-shortest'
+                ]
         has_audio = True
     else:
         cmd_out += [
             '-map', '0:v'
         ]
         
-    if headline_text:
-        if check_drawtext_support(ffmpeg_path):
-            escaped_text = headline_text.replace("'", "'\\\\''").replace(":", "\\:")
-            font_path = "/System/Library/Fonts/Helvetica.ttc"
-            cmd_out += [
-                '-vf', f"drawtext=fontfile={font_path}:text='{escaped_text}':fontcolor=white:fontsize=28:box=1:boxcolor=black@0.6:boxborderw=15:x=(w-text_w)/2:y=40"
-            ]
+    v_filters = []
+    if headline_text and check_drawtext_support(ffmpeg_path):
+        escaped_text = headline_text.replace("'", "'\\\\''").replace(":", "\\:")
+        font_path = get_system_font_path()
+        if font_path:
+            v_filters.append(f"drawtext=fontfile='{font_path}':text='{escaped_text}':fontcolor=white:fontsize=28:box=1:boxcolor=black@0.6:boxborderw=15:x=(w-text_w)/2:y=40")
         else:
-            sys.stderr.write("Warning: 'drawtext' filter not supported by ffmpeg. Skipping headline text overlay.\n")
+            v_filters.append(f"drawtext=text='{escaped_text}':fontcolor=white:fontsize=28:box=1:boxcolor=black@0.6:boxborderw=15:x=(w-text_w)/2:y=40")
+
+    if subtitle_path and os.path.exists(subtitle_path):
+        escaped_sub = subtitle_path.replace('\\', '/').replace(':', '\\:').replace("'", "'\\\\''")
+        v_filters.append(f"ass='{escaped_sub}'")
+
+    if v_filters:
+        cmd_out += ['-vf', ",".join(v_filters)]
         
     cmd_out += [
         '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
@@ -419,7 +455,9 @@ def main():
             cur_h = (cur_h // 2) * 2
             
             x = cx - cur_w // 2
-            y = cy - cur_h // 2
+            # Headroom adjustment: keep face naturally framed in upper-middle portion (Rule of Thirds)
+            headroom_offset = int(cur_h * 0.08) if aspect_ratio == '9:16' else 0
+            y = (cy - cur_h // 2) + headroom_offset
             x = max(0, min(W - cur_w, x))
             y = max(0, min(H - cur_h, y))
             x = (x // 2) * 2

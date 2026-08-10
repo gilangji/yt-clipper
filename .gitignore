@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment variables & secrets
+.env
+env
+
+# Logs
+logs/
+*.log
+
+# Runtime data & media folders
+downloads/*
+!downloads/.gitkeep
+output/*
+!output/.gitkeep
+temp/*
+!temp/.gitkeep
+
+# Python cache & compiled files
+__pycache__/
+*.pyc
+
+# System / OS
+.DS_Store
+Thumbs.db

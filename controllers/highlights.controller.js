@@ -8,47 +8,114 @@ const fs = require('fs');
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
 const highlightService = require('../services/highlight.service');
+const ytdlpService = require('../services/ytdlp.service');
+const { extractVideoId } = require('../utils/urlValidator');
 const { fileExists } = require('../utils/fileHelper');
 const config = require('../config');
+const logger = require('../utils/logger');
 const { ERROR_CODES } = require('../config/constants');
+
+/**
+ * Helper untuk menunggu file download yang sedang berjalan (.part)
+ */
+async function waitForDownloadCompletion(folder, videoId, maxWaitMs = 45000) {
+  const startTime = Date.now();
+  while (Date.now() - startTime < maxWaitMs) {
+    try {
+      const files = fs.readdirSync(folder);
+      const readyFile = files.find(f => f.startsWith(`${videoId}_`) && f.endsWith('.mp4') && !f.includes('.part'));
+      if (readyFile) {
+        const fullPath = path.join(folder, readyFile);
+        const stat = fs.statSync(fullPath);
+        if (stat.size > 102400) return fullPath;
+      }
+    } catch (e) {}
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  return null;
+}
 
 /**
  * Menganalisis video sumber untuk mendeteksi highlights.
  */
 const getHighlights = asyncHandler(async (req, res) => {
-  const { videoPath, video_path } = req.body;
-  const targetName = videoPath || video_path;
+  const { videoPath, video_path, url = '', title = '', targetDuration, maxHighlights } = req.body;
+  const targetName = videoPath || video_path || url;
 
   if (!targetName) {
-    throw AppError.badRequest('Nama file video tidak boleh kosong.', ERROR_CODES.VALIDATION_ERROR);
+    throw AppError.badRequest('Target video atau URL tidak boleh kosong.', ERROR_CODES.VALIDATION_ERROR);
   }
 
-  // Resolve path ke folder downloads
   const baseName = path.basename(targetName);
-  let absolutePath = path.join(config.folders.downloads, baseName);
+  const videoId = (url ? extractVideoId(url) : null) || baseName.split('_')[0].split('.')[0];
 
-  if (!fileExists(absolutePath)) {
-    // Coba cari di folder temp jika video disimpan sementara
-    const tempPath = path.join(config.folders.temp, baseName);
-    if (fileExists(tempPath)) {
-      absolutePath = tempPath;
-    }
-  }
+  const searchFolders = [
+    config.folders.downloads,
+    '/home/teemo/yt-clipper/downloads',
+    '/home/teemo/yt-clipper-mobile/downloads',
+    config.folders.temp,
+  ];
 
-  if (!fileExists(absolutePath)) {
-    // Coba cari file mp4 apapun di temp/ atau downloads/ yang mengandung baseName
+  let absolutePath = null;
+
+  // 1. Cari file siap pakai di folder-folder download
+  for (const folder of searchFolders) {
+    if (!fs.existsSync(folder)) continue;
     try {
-      const tempFiles = fs.readdirSync(config.folders.temp);
-      const matchTemp = tempFiles.find(f => f.includes(baseName) || f.endsWith('.mp4'));
-      if (matchTemp) absolutePath = path.join(config.folders.temp, matchTemp);
+      const files = fs.readdirSync(folder);
+      const match = files.find(f => f.startsWith(`${videoId}_`) && f.endsWith('.mp4') && !f.includes('.part'));
+      if (match) {
+        const full = path.join(folder, match);
+        const stat = fs.statSync(full);
+        if (stat.size > 102400) {
+          absolutePath = full;
+          break;
+        }
+      }
     } catch (e) {}
   }
 
-  if (!fileExists(absolutePath)) {
-    throw AppError.notFound('Video sumber tidak ditemukan. Silakan muat video terlebih dahulu.', ERROR_CODES.FILE_NOT_FOUND);
+  // 2. Jika belum ada, cek apakah sedang di-download (.part file) -> tunggu hingga selesai
+  if (!absolutePath) {
+    for (const folder of searchFolders) {
+      if (!fs.existsSync(folder)) continue;
+      try {
+        const files = fs.readdirSync(folder);
+        const isPart = files.some(f => f.startsWith(`${videoId}_`) && f.includes('.part'));
+        if (isPart) {
+          logger.info('Menunggu download video selesai untuk analisis highlights...', { videoId, folder });
+          const finished = await waitForDownloadCompletion(folder, videoId, 45000);
+          if (finished) {
+            absolutePath = finished;
+            break;
+          }
+        }
+      } catch (e) {}
+    }
   }
 
-  const result = await highlightService.detectHighlights(absolutePath);
+  // 3. Jika masih belum ada dan URL tersedia -> download on-the-fly
+  if (!absolutePath && url) {
+    logger.info('Mendownload video on-demand untuk highlights...', { url, videoId });
+    const targetFile = path.join(config.folders.downloads, `${videoId}_360p.mp4`);
+    try {
+      absolutePath = await ytdlpService.downloadVideo(url, targetFile, '360p');
+    } catch (dlErr) {
+      logger.error('Gagal mendownload video untuk highlights', { error: dlErr.message });
+    }
+  }
+
+  if (!absolutePath || !fileExists(absolutePath)) {
+    throw AppError.notFound(
+      'Video sumber sedang diunduh di latar belakang. Silakan tunggu beberapa detik lalu klik Pindai Highlights kembali.',
+      ERROR_CODES.FILE_NOT_FOUND
+    );
+  }
+
+  const result = await highlightService.detectHighlights(absolutePath, title, {
+    targetDuration,
+    maxHighlights,
+  });
 
   res.json({
     success: true,

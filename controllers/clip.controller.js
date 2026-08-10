@@ -32,7 +32,20 @@ const startClip = asyncHandler(async (req, res) => {
     heatmapOverlay = false,
     dynamicZoom = false,
     audioEnhance = false,
-    headlineText = ''
+    silenceRemover = false,
+    headlineText = '',
+    autoSubtitle = false,
+    subtitleStyle = 'quick-brown-inv',
+    subtitleSize = 'large',
+    subtitlePosition = 'bottom',
+    subtitleCase = 'uppercase',
+    subtitleLanguage = 'auto',
+    subtitleFont = 'auto',
+    clipTitle = '',
+    clipTags = '',
+    clipDescription = '',
+    bgmTrack = 'none',
+    bgmVolume = 0.10
   } = req.body;
 
   const videoId = extractVideoId(url);
@@ -72,7 +85,20 @@ const startClip = asyncHandler(async (req, res) => {
     heatmapOverlay,
     dynamicZoom,
     audioEnhance,
-    headlineText
+    silenceRemover: !!silenceRemover,
+    headlineText,
+    autoSubtitle: !!autoSubtitle,
+    subtitleStyle,
+    subtitleSize,
+    subtitlePosition,
+    subtitleCase,
+    subtitleLanguage,
+    subtitleFont,
+    clipTitle,
+    clipTags,
+    clipDescription,
+    bgmTrack,
+    bgmVolume
   });
 
   logger.info('Job clip baru didaftarkan', {
