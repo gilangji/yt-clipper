@@ -59,18 +59,20 @@ def get_video_specs(ffprobe_path, filepath):
 def parse_aspect_ratio_val(aspect_ratio, W, H):
     if aspect_ratio == 'original' or not aspect_ratio:
         return W / H
-    if ':' in str(aspect_ratio):
+    s_ratio = str(aspect_ratio)
+    if s_ratio.startswith('9:16'):
+        return 9.0 / 16.0
+    if s_ratio.startswith('1:1'):
+        return 1.0
+    if ':' in s_ratio:
         try:
-            parts = str(aspect_ratio).replace('custom:', '').split(':')
+            clean_str = s_ratio.replace('custom:', '').split('-')[0]
+            parts = clean_str.split(':')
             num, den = float(parts[0]), float(parts[1])
             if den > 0:
                 return num / den
         except Exception:
             pass
-    if aspect_ratio == '9:16-split' or aspect_ratio == '9:16':
-        return 9.0 / 16.0
-    if aspect_ratio == '1:1':
-        return 1.0
     return W / H
 
 def get_crop_center(t, crops, W, H):
