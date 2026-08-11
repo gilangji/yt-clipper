@@ -125,6 +125,7 @@ def get_dual_crop_centers(t, crops, W, H):
     """
     Mengambil posisi pusat (cx, cy) terpisah untuk Tokoh Kiri (Frame Atas)
     dan Tokoh Kanan (Frame Bawah) dalam format 9:16 Dual-Split Screen.
+    Mengembalikan ((cx1, cy1), (cx2, cy2), landmarks, has_two_speakers).
     """
     cx_main, cy_main, landmarks = get_crop_center(t, crops, W, H)
 
@@ -133,44 +134,32 @@ def get_dual_crop_centers(t, crops, W, H):
         crops_valid = [c for c in crops if c.get('cx') is not None]
         if crops_valid:
             closest = min(crops_valid, key=lambda c: abs(c.get('time', 0) - t))
-            if abs(closest.get('time', 0) - t) < 0.5 and 'cx2' in closest and closest['cx2'] is not None:
+            if abs(closest.get('time', 0) - t) < 0.8 and 'cx2' in closest and closest['cx2'] is not None:
                 c1_x = int(closest['cx'] * W)
                 c1_y = int(closest.get('cy', 0.5) * H)
                 c2_x = int(closest['cx2'] * W)
                 c2_y = int(closest.get('cy2', 0.5) * H)
-                # Tokoh Kiri → Frame Atas, Tokoh Kanan → Frame Bawah
                 if c1_x <= c2_x:
-                    return (c1_x, c1_y), (c2_x, c2_y), landmarks
+                    return (c1_x, c1_y), (c2_x, c2_y), landmarks, True
                 else:
-                    return (c2_x, c2_y), (c1_x, c1_y), landmarks
+                    return (c2_x, c2_y), (c1_x, c1_y), landmarks, True
 
-    # 2. Posisi default simetris jika tidak ada 2 deteksi terpisah
-    cx_left = int(W * 0.28)
-    cy_left = cy_main
-    cx_right = int(W * 0.72)
-    cy_right = cy_main
-
-    if cx_main < W // 2:
-        cx_left = cx_main
-        cy_left = cy_main
-    else:
-        cx_right = cx_main
-        cy_right = cy_main
-
-    # 3. Cari sampel wajah di sisi berlawanan dekat waktu t
+    # 2. Cek apakah dalam window 1.2s terdapat sampel di sisi Kiri (<45%) DAN sisi Kanan (>55%)
     if crops:
-        crops_valid = [c for c in crops if c.get('cx') is not None]
-        opposite_crops = [c for c in crops_valid if (cx_main < W // 2 and c['cx'] * W >= W // 2) or (cx_main >= W // 2 and c['cx'] * W < W // 2)]
-        if opposite_crops:
-            best_opp = min(opposite_crops, key=lambda c: abs(c.get('time', 0) - t))
-            if cx_main < W // 2:
-                cx_right = int(best_opp['cx'] * W)
-                cy_right = int(best_opp.get('cy', 0.5) * H)
-            else:
-                cx_left = int(best_opp['cx'] * W)
-                cy_left = int(best_opp.get('cy', 0.5) * H)
+        window_crops = [c for c in crops if c.get('cx') is not None and abs(c.get('time', 0) - t) <= 1.2]
+        left_crops = [c for c in window_crops if c['cx'] < 0.45]
+        right_crops = [c for c in window_crops if c['cx'] > 0.55]
+        if left_crops and right_crops:
+            best_left = min(left_crops, key=lambda c: abs(c.get('time', 0) - t))
+            best_right = min(right_crops, key=lambda c: abs(c.get('time', 0) - t))
+            c1_x = int(best_left['cx'] * W)
+            c1_y = int(best_left.get('cy', 0.5) * H)
+            c2_x = int(best_right['cx'] * W)
+            c2_y = int(best_right.get('cy', 0.5) * H)
+            return (c1_x, c1_y), (c2_x, c2_y), landmarks, True
 
-    return (cx_left, cy_left), (cx_right, cy_right), landmarks
+    # 3. Jika hanya 1 pembicara di frame saat ini -> belum ada split (single crop)
+    return (cx_main, cy_main), (cx_main, cy_main), landmarks, False
 
 def merge_multi_range_audio(ffmpeg_path, original_path, time_ranges, cropped_video_path, audio_enhance=False):
     temp_dir = os.path.dirname(cropped_video_path)
@@ -476,8 +465,9 @@ def main():
             t = start_t + frame_idx / fps
             frame = np.frombuffer(raw_frame, dtype=np.uint8).reshape((H, W, 3))
             
+            has_two_speakers = False
             if is_split_dual:
-                (raw_cx1, raw_cy1), (raw_cx2, raw_cy2), landmarks = get_dual_crop_centers(t, crops, W, H)
+                (raw_cx1, raw_cy1), (raw_cx2, raw_cy2), landmarks, has_two_speakers = get_dual_crop_centers(t, crops, W, H)
                 if cam_cx is None or cam_cy is None:
                     cam_cx, cam_cy = float(raw_cx1), float(raw_cy1)
                     cam_cx2, cam_cy2 = float(raw_cx2), float(raw_cy2)
@@ -559,7 +549,7 @@ def main():
                 cropped_frame = (alpha * color_map + (1.0 - alpha) * cropped_frame).astype(np.uint8)
                 
             # If Split-Screen: combine speaker (top) and dynamic liquid wave background (bottom) or dual speaker
-            if is_split_dual:
+            if is_split_dual and has_two_speakers:
                 final_frame = np.zeros((H_out, W_out, 3), dtype=np.uint8)
                 speaker_h = H_out // 2
                 
